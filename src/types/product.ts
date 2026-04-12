@@ -19,6 +19,35 @@ export type ProductItem = {
   reviewsCount: number;
 };
 
+export type ProductSpecification = {
+  label: string;
+  value: string;
+};
+
+export type ProductDetails = {
+  overview: string;
+  highlights: string[];
+  specifications: ProductSpecification[];
+  included: string[];
+};
+
+export type CatalogCategory = {
+  id: ProductCategory;
+  title: string;
+  description: string;
+};
+
+export type CatalogProductRecord = ProductItem & {
+  details: ProductDetails;
+};
+
+export type CatalogDatabase = {
+  version: number;
+  seededAt: string;
+  categories: CatalogCategory[];
+  products: CatalogProductRecord[];
+};
+
 export type ProductPriceFilter =
   | 'all'
   | 'under-10000'

@@ -13,29 +13,36 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandMark } from '../components/brand-mark';
 import { PrimaryButton } from '../components/primary-button';
 import {
-  catalogBrands,
   catalogCategories,
   catalogPriceFilters,
+  getCatalogBrands,
   getCatalogCategoryTitle,
-  productCatalog,
 } from '../data/catalog';
 import {
   addItemToUserCart,
   calculateCartTotals,
   ensureUserCart,
 } from '../storage/cart-storage';
+import { loadCatalogDatabase } from '../storage/catalog-storage';
 import { loadUserOrders } from '../storage/orders-storage';
 import { colors } from '../theme/colors';
 import type { AuthSession } from '../types/auth';
 import type { UserCart } from '../types/cart';
 import type { UserOrder } from '../types/order';
-import type { ProductCategory, ProductItem, ProductPriceFilter } from '../types/product';
+import type {
+  CatalogCategory,
+  CatalogProductRecord,
+  ProductCategory,
+  ProductItem,
+  ProductPriceFilter,
+} from '../types/product';
 
 type HomeScreenProps = {
   session: AuthSession;
   notice?: string;
   onOpenOrders: () => void;
   onOpenCart: () => void;
+  onOpenProduct: (productId: string) => void;
   onOpenProfile: () => void;
   onOpenChangePassword: () => void;
   onLogout: () => void;
@@ -77,14 +84,18 @@ export function HomeScreen({
   notice = '',
   onOpenOrders,
   onOpenCart,
+  onOpenProduct,
   onOpenProfile,
   onOpenChangePassword,
   onLogout,
 }: HomeScreenProps) {
   const [orders, setOrders] = useState<UserOrder[]>([]);
   const [cart, setCart] = useState<UserCart | null>(null);
+  const [catalogProducts, setCatalogProducts] = useState<CatalogProductRecord[]>([]);
+  const [catalogCategoryList, setCatalogCategoryList] = useState<CatalogCategory[]>(catalogCategories);
   const [isOrdersLoading, setIsOrdersLoading] = useState(true);
   const [isCartLoading, setIsCartLoading] = useState(true);
+  const [isCatalogLoading, setIsCatalogLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<CatalogTab>('all');
   const [activeBrand, setActiveBrand] = useState<BrandFilter>('all');
   const [activePriceFilter, setActivePriceFilter] = useState<ProductPriceFilter>('all');
@@ -98,10 +109,12 @@ export function HomeScreen({
     const hydrateHome = async () => {
       setIsOrdersLoading(true);
       setIsCartLoading(true);
+      setIsCatalogLoading(true);
 
-      const [storedOrders, storedCart] = await Promise.all([
+      const [storedOrders, storedCart, catalogDatabase] = await Promise.all([
         loadUserOrders(session.email),
         ensureUserCart(session.email),
+        loadCatalogDatabase(),
       ]);
 
       if (!isMounted) {
@@ -110,8 +123,11 @@ export function HomeScreen({
 
       setOrders(storedOrders);
       setCart(storedCart);
+      setCatalogProducts(catalogDatabase.products);
+      setCatalogCategoryList(catalogDatabase.categories);
       setIsOrdersLoading(false);
       setIsCartLoading(false);
+      setIsCatalogLoading(false);
     };
 
     void hydrateHome();
@@ -123,28 +139,35 @@ export function HomeScreen({
 
   const latestOrder = orders[0] ?? null;
   const cartTotals = useMemo(() => calculateCartTotals(cart?.items ?? []), [cart?.items]);
+  const catalogBrands = useMemo(() => getCatalogBrands(catalogProducts), [catalogProducts]);
 
   const visibleProducts = useMemo(() => {
     const normalizedSearchQuery = normalizeValue(searchQuery);
 
-    return productCatalog.filter((product) => {
+    return catalogProducts.filter((product) => {
       const matchesCategory =
         activeCategory === 'all' ? true : product.category === activeCategory;
       const matchesBrand = activeBrand === 'all' ? true : product.brand === activeBrand;
       const matchesSearch = normalizedSearchQuery
-        ? [product.title, product.subtitle, product.brand, product.badge ?? '', getCatalogCategoryTitle(product.category)]
+        ? [
+            product.title,
+            product.subtitle,
+            product.brand,
+            product.badge ?? '',
+            getCatalogCategoryTitle(product.category, catalogCategoryList),
+          ]
             .some((value) => normalizeValue(value).includes(normalizedSearchQuery))
         : true;
       const matchesPrice = matchesPriceFilter(product, activePriceFilter);
 
       return matchesCategory && matchesBrand && matchesSearch && matchesPrice;
     });
-  }, [activeBrand, activeCategory, activePriceFilter, searchQuery]);
+  }, [activeBrand, activeCategory, activePriceFilter, catalogCategoryList, catalogProducts, searchQuery]);
 
   const heroTitle =
     activeCategory === 'all'
       ? 'Знаходьте товари швидше'
-      : `Категорія: ${getCatalogCategoryTitle(activeCategory)}`;
+      : `Категорія: ${getCatalogCategoryTitle(activeCategory, catalogCategoryList)}`;
 
   const appliedFiltersCount = useMemo(() => {
     let count = 0;
@@ -214,7 +237,7 @@ export function HomeScreen({
           <View style={styles.heroMetricsRow}>
             <View style={styles.heroMetricBox}>
               <Text style={styles.heroMetricLabel}>Результати</Text>
-              <Text style={styles.heroMetricValue}>{resultsLabel}</Text>
+              <Text style={styles.heroMetricValue}>{isCatalogLoading ? '...' : resultsLabel}</Text>
             </View>
             <View style={styles.heroMetricBox}>
               <Text style={styles.heroMetricLabel}>Фільтри</Text>
@@ -278,7 +301,7 @@ export function HomeScreen({
               </Text>
             </Pressable>
 
-            {catalogCategories.map((category) => {
+            {catalogCategoryList.map((category) => {
               const isActive = activeCategory === category.id;
 
               return (
@@ -361,7 +384,14 @@ export function HomeScreen({
           </ScrollView>
 
           <View style={styles.productsList}>
-            {visibleProducts.length ? (
+            {isCatalogLoading ? (
+              <View style={styles.catalogLoaderCard}>
+                <ActivityIndicator size="small" color={colors.accent} />
+                <Text style={styles.catalogLoaderText}>
+                  Каталог заповнюється автоматично товарами та категоріями...
+                </Text>
+              </View>
+            ) : visibleProducts.length ? (
               visibleProducts.map((product) => {
                 const isBusy = activeProductId === product.id;
 
@@ -373,7 +403,7 @@ export function HomeScreen({
                         {product.badge ? <Text style={styles.productBadge}>{product.badge}</Text> : null}
                       </View>
                       <Text style={styles.productCategoryLabel}>
-                        {getCatalogCategoryTitle(product.category)}
+                        {getCatalogCategoryTitle(product.category, catalogCategoryList)}
                       </Text>
                     </View>
 
@@ -395,18 +425,29 @@ export function HomeScreen({
                         ) : null}
                       </View>
 
-                      <Pressable
-                        onPress={() => void handleAddProduct(product)}
-                        disabled={isBusy}
-                        style={({ pressed }) => [
-                          styles.addToCartButton,
-                          isBusy && styles.addToCartButtonDisabled,
-                          pressed && !isBusy && styles.addToCartButtonPressed,
-                        ]}>
-                        <Text style={styles.addToCartButtonText}>
-                          {isBusy ? 'Додаємо...' : 'В кошик'}
-                        </Text>
-                      </Pressable>
+                      <View style={styles.productActionsColumn}>
+                        <Pressable
+                          onPress={() => onOpenProduct(product.id)}
+                          style={({ pressed }) => [
+                            styles.viewProductButton,
+                            pressed && styles.viewProductButtonPressed,
+                          ]}>
+                          <Text style={styles.viewProductButtonText}>Переглянути</Text>
+                        </Pressable>
+
+                        <Pressable
+                          onPress={() => void handleAddProduct(product)}
+                          disabled={isBusy}
+                          style={({ pressed }) => [
+                            styles.addToCartButton,
+                            isBusy && styles.addToCartButtonDisabled,
+                            pressed && !isBusy && styles.addToCartButtonPressed,
+                          ]}>
+                          <Text style={styles.addToCartButtonText}>
+                            {isBusy ? 'Додаємо...' : 'В кошик'}
+                          </Text>
+                        </Pressable>
+                      </View>
                     </View>
                   </View>
                 );
@@ -483,7 +524,7 @@ export function HomeScreen({
           <Text style={styles.sectionLabel}>{notice ? 'Остання дія' : 'Поточний статус'}</Text>
           <Text style={styles.noteText}>
             {notice ||
-              'Пошук і фільтрація вже працюють локально: можна відбирати товари за назвою, брендом, категорією та ціною.'}
+              'Каталог тепер сідається в локальну базу автоматично: товари й категорії підтягуються зі storage та готові до подальшого масштабування.'}
           </Text>
         </View>
 
@@ -818,6 +859,29 @@ const styles = StyleSheet.create({
   priceBlock: {
     flex: 1,
   },
+  productActionsColumn: {
+    minWidth: 132,
+    gap: 10,
+  },
+  viewProductButton: {
+    minHeight: 42,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  viewProductButtonPressed: {
+    transform: [{ translateY: 1 }],
+    backgroundColor: '#eef3ef',
+  },
+  viewProductButtonText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.textDark,
+  },
   productPrice: {
     fontSize: 24,
     lineHeight: 28,
@@ -850,6 +914,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '900',
     color: colors.textLight,
+  },
+  catalogLoaderCard: {
+    padding: 20,
+    borderRadius: 20,
+    backgroundColor: colors.cardMuted,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    alignItems: 'center',
+    gap: 12,
+  },
+  catalogLoaderText: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    color: colors.textMutedDark,
   },
   emptyResultsCard: {
     padding: 20,

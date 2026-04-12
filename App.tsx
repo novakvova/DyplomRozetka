@@ -10,15 +10,24 @@ import { HomeScreen } from './src/screens/home-screen';
 import { LoginScreen } from './src/screens/login-screen';
 import { OrdersScreen } from './src/screens/orders-screen';
 import { ProfileScreen } from './src/screens/profile-screen';
+import { ProductDetailsScreen } from './src/screens/product-details-screen';
 import { RecoveryScreen } from './src/screens/recovery-screen';
 import { RegisterScreen } from './src/screens/register-screen';
+import { seedCatalogDatabase } from './src/storage/catalog-storage';
 import { clearSession, loadSession, saveSession } from './src/storage/session-storage';
 import { loadRegisteredUsers, saveRegisteredUsers } from './src/storage/users-storage';
 import { colors } from './src/theme/colors';
 import type { AuthActionResult, AuthSession, RegisteredUser } from './src/types/auth';
 
 type AuthScreen = 'login' | 'register' | 'recovery';
-type CabinetScreen = 'home' | 'profile' | 'change-password' | 'cart' | 'checkout' | 'orders';
+type CabinetScreen =
+  | 'home'
+  | 'profile'
+  | 'change-password'
+  | 'cart'
+  | 'checkout'
+  | 'orders'
+  | 'product-details';
 
 export default function App() {
   const [session, setSession] = useState<AuthSession | null>(null);
@@ -26,6 +35,7 @@ export default function App() {
   const [authScreen, setAuthScreen] = useState<AuthScreen>('login');
   const [loginNotice, setLoginNotice] = useState('');
   const [cabinetScreen, setCabinetScreen] = useState<CabinetScreen>('home');
+  const [selectedProductId, setSelectedProductId] = useState('');
   const [cabinetNotice, setCabinetNotice] = useState('');
   const [isHydrating, setIsHydrating] = useState(true);
 
@@ -33,7 +43,7 @@ export default function App() {
     let isMounted = true;
 
     const hydrateSession = async () => {
-      const storedSession = await loadSession();
+      const [storedSession] = await Promise.all([loadSession(), seedCatalogDatabase()]);
 
       if (!isMounted) {
         return;
@@ -294,6 +304,12 @@ export default function App() {
     setCabinetScreen('orders');
   };
 
+  const openProductDetails = (productId: string) => {
+    setCabinetNotice('');
+    setSelectedProductId(productId);
+    setCabinetScreen('product-details');
+  };
+
   const openCabinetHome = () => {
     setCabinetNotice('');
     setCabinetScreen('home');
@@ -312,6 +328,14 @@ export default function App() {
             email={session.email}
             onBack={openCabinetHome}
             onOpenCart={openCart}
+          />
+        ) : cabinetScreen === 'product-details' ? (
+          <ProductDetailsScreen
+            email={session.email}
+            productId={selectedProductId}
+            onBack={openCabinetHome}
+            onOpenCart={openCart}
+            onOpenProduct={openProductDetails}
           />
         ) : cabinetScreen === 'checkout' ? (
           <CheckoutScreen
@@ -339,6 +363,7 @@ export default function App() {
             notice={cabinetNotice}
             onOpenOrders={openOrders}
             onOpenCart={openCart}
+            onOpenProduct={openProductDetails}
             onOpenProfile={openProfile}
             onOpenChangePassword={openChangePassword}
             onLogout={handleLogout}

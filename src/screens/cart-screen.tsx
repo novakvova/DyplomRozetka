@@ -14,7 +14,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandMark } from '../components/brand-mark';
 import { PrimaryButton } from '../components/primary-button';
-import { productCatalog } from '../data/catalog';
 import {
   addItemToUserCart,
   calculateCartTotals,
@@ -22,9 +21,10 @@ import {
   removeItemFromUserCart,
   updateUserCartItemQuantity,
 } from '../storage/cart-storage';
+import { loadCatalogProducts } from '../storage/catalog-storage';
 import { colors } from '../theme/colors';
 import type { UserCart } from '../types/cart';
-import type { ProductItem } from '../types/product';
+import type { CatalogProductRecord, ProductItem } from '../types/product';
 
 type CartScreenProps = {
   email: string;
@@ -33,11 +33,12 @@ type CartScreenProps = {
 };
 
 const cartPoints = ['Товари', 'Кількість', 'Підсумок'];
-const featuredCartProducts = productCatalog.slice(0, 5);
 
 export function CartScreen({ email, onBack, onOpenCheckout }: CartScreenProps) {
   const [cart, setCart] = useState<UserCart | null>(null);
+  const [featuredProducts, setFeaturedProducts] = useState<CatalogProductRecord[]>([]);
   const [isHydrating, setIsHydrating] = useState(true);
+  const [isCatalogLoading, setIsCatalogLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [activeProductId, setActiveProductId] = useState('');
   const [activeQuantityItemId, setActiveQuantityItemId] = useState('');
@@ -66,14 +67,20 @@ export function CartScreen({ email, onBack, onOpenCheckout }: CartScreenProps) {
     let isMounted = true;
 
     const hydrateCart = async () => {
-      const storedCart = await ensureUserCart(email);
+      setIsCatalogLoading(true);
+      const [storedCart, catalogProducts] = await Promise.all([
+        ensureUserCart(email),
+        loadCatalogProducts(),
+      ]);
 
       if (!isMounted) {
         return;
       }
 
       setCart(storedCart);
+      setFeaturedProducts(catalogProducts.slice(0, 5));
       setIsHydrating(false);
+      setIsCatalogLoading(false);
     };
 
     void hydrateCart();
@@ -333,25 +340,34 @@ export function CartScreen({ email, onBack, onOpenCheckout }: CartScreenProps) {
               </Text>
 
               <View style={styles.catalogList}>
-                {featuredCartProducts.map((product) => (
-                  <View key={product.id} style={styles.catalogItem}>
-                    <View style={styles.catalogInfo}>
-                      <Text style={styles.catalogBadge}>{product.subtitle}</Text>
-                      <Text style={styles.catalogTitle}>{product.title}</Text>
-                      <Text style={styles.catalogPrice}>
-                        {product.price.toLocaleString('uk-UA')} грн
-                      </Text>
-                    </View>
-
-                    <View style={styles.catalogAction}>
-                      <PrimaryButton
-                        title={activeProductId === product.id ? 'Додаємо...' : 'Додати'}
-                        onPress={() => void handleAddProduct(product)}
-                        disabled={Boolean(activeProductId)}
-                      />
-                    </View>
+                {isCatalogLoading ? (
+                  <View style={styles.catalogLoaderCard}>
+                    <ActivityIndicator size="small" color={colors.accent} />
+                    <Text style={styles.catalogLoaderText}>
+                      Автоматично підтягуємо товари з локальної бази каталогу...
+                    </Text>
                   </View>
-                ))}
+                ) : (
+                  featuredProducts.map((product) => (
+                    <View key={product.id} style={styles.catalogItem}>
+                      <View style={styles.catalogInfo}>
+                        <Text style={styles.catalogBadge}>{product.subtitle}</Text>
+                        <Text style={styles.catalogTitle}>{product.title}</Text>
+                        <Text style={styles.catalogPrice}>
+                          {product.price.toLocaleString('uk-UA')} грн
+                        </Text>
+                      </View>
+
+                      <View style={styles.catalogAction}>
+                        <PrimaryButton
+                          title={activeProductId === product.id ? 'Додаємо...' : 'Додати'}
+                          onPress={() => void handleAddProduct(product)}
+                          disabled={Boolean(activeProductId)}
+                        />
+                      </View>
+                    </View>
+                  ))
+                )}
               </View>
             </Animated.View>
 
@@ -365,7 +381,7 @@ export function CartScreen({ email, onBack, onOpenCheckout }: CartScreenProps) {
               ]}>
               <Text style={styles.noteLabel}>Що вже підготовлено</Text>
               <Text style={styles.noteText}>
-                Для цього користувача зберігається окремий кошик. Далі ми зможемо без зміни архітектури додавати товари, змінювати кількість, видаляти позиції та рахувати підсумок.
+                Для цього користувача зберігається окремий кошик, а сам каталог тепер автоматично сідається в локальну базу з товарами та категоріями.
               </Text>
             </Animated.View>
 
@@ -715,6 +731,21 @@ const styles = StyleSheet.create({
   catalogList: {
     marginTop: 18,
     gap: 12,
+  },
+  catalogLoaderCard: {
+    padding: 18,
+    borderRadius: 22,
+    backgroundColor: colors.cardMuted,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    alignItems: 'center',
+    gap: 12,
+  },
+  catalogLoaderText: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    color: colors.textMutedDark,
   },
   catalogItem: {
     padding: 18,
