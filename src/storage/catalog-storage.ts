@@ -19,14 +19,7 @@ type CatalogDatabaseCandidate = Partial<CatalogDatabase> & {
 };
 
 function isValidProductCategory(value: unknown): value is ProductCategory {
-  return (
-    value === 'smartphones' ||
-    value === 'laptops' ||
-    value === 'audio' ||
-    value === 'gaming' ||
-    value === 'home' ||
-    value === 'accessories'
-  );
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function isValidProductSpecification(value: unknown): value is ProductSpecification {
@@ -114,7 +107,7 @@ function isValidCatalogDatabase(value: unknown): value is CatalogDatabase {
   );
 }
 
-async function saveCatalogDatabase(database: CatalogDatabase) {
+export async function saveCatalogDatabase(database: CatalogDatabase) {
   await AsyncStorage.setItem(CATALOG_STORAGE_KEY, JSON.stringify(database));
   return database;
 }
@@ -176,4 +169,158 @@ export async function loadCatalogProducts() {
 
 export async function resetCatalogDatabase() {
   return seedCatalogDatabase(true);
+}
+
+function sortCatalogDatabase(database: CatalogDatabase): CatalogDatabase {
+  return {
+    ...database,
+    categories: [...database.categories].sort((left, right) =>
+      left.title.localeCompare(right.title, 'uk-UA')
+    ),
+    products: [...database.products].sort((left, right) =>
+      left.title.localeCompare(right.title, 'uk-UA')
+    ),
+  };
+}
+
+export async function updateCatalogCategory(
+  nextCategory: CatalogCategory,
+  previousCategoryId?: string
+) {
+  const database = await loadCatalogDatabase();
+  const normalizedCategoryId = nextCategory.id.trim().toLowerCase();
+  const normalizedPreviousCategoryId = previousCategoryId?.trim().toLowerCase();
+
+  if (!normalizedCategoryId) {
+    throw new Error('CATEGORY_ID_REQUIRED');
+  }
+
+  const categoryWithSameId = database.categories.find(
+    (category) => category.id.trim().toLowerCase() === normalizedCategoryId
+  );
+
+  if (
+    categoryWithSameId &&
+    (!normalizedPreviousCategoryId ||
+      categoryWithSameId.id.trim().toLowerCase() !== normalizedPreviousCategoryId)
+  ) {
+    throw new Error('CATEGORY_ID_TAKEN');
+  }
+
+  const sanitizedCategory: CatalogCategory = {
+    id: normalizedCategoryId,
+    title: nextCategory.title.trim(),
+    description: nextCategory.description.trim(),
+  };
+
+  const updatedCategories = database.categories.some(
+    (category) => category.id.trim().toLowerCase() === (normalizedPreviousCategoryId ?? normalizedCategoryId)
+  )
+    ? database.categories.map((category) =>
+        category.id.trim().toLowerCase() === (normalizedPreviousCategoryId ?? normalizedCategoryId)
+          ? sanitizedCategory
+          : category
+      )
+    : [...database.categories, sanitizedCategory];
+
+  const updatedProducts =
+    normalizedPreviousCategoryId && normalizedPreviousCategoryId !== normalizedCategoryId
+      ? database.products.map((product) =>
+          product.category.trim().toLowerCase() === normalizedPreviousCategoryId
+            ? {
+                ...product,
+                category: normalizedCategoryId,
+              }
+            : product
+        )
+      : database.products;
+
+  return saveCatalogDatabase(
+    sortCatalogDatabase({
+      ...database,
+      categories: updatedCategories,
+      products: updatedProducts,
+    })
+  );
+}
+
+export async function removeCatalogCategory(categoryId: string) {
+  const database = await loadCatalogDatabase();
+  const normalizedCategoryId = categoryId.trim().toLowerCase();
+  const categoryProductsCount = database.products.filter(
+    (product) => product.category.trim().toLowerCase() === normalizedCategoryId
+  ).length;
+
+  if (categoryProductsCount) {
+    throw new Error('CATEGORY_IN_USE');
+  }
+
+  return saveCatalogDatabase({
+    ...database,
+    categories: database.categories.filter(
+      (category) => category.id.trim().toLowerCase() !== normalizedCategoryId
+    ),
+  });
+}
+
+export async function upsertCatalogProduct(nextProduct: CatalogProductRecord) {
+  const database = await loadCatalogDatabase();
+  const normalizedProductId = nextProduct.id.trim().toLowerCase();
+  const normalizedCategoryId = nextProduct.category.trim().toLowerCase();
+
+  if (!database.categories.some((category) => category.id.trim().toLowerCase() === normalizedCategoryId)) {
+    throw new Error('CATEGORY_NOT_FOUND');
+  }
+
+  const sanitizedProduct: CatalogProductRecord = {
+    ...nextProduct,
+    id: normalizedProductId,
+    category: normalizedCategoryId,
+    title: nextProduct.title.trim(),
+    subtitle: nextProduct.subtitle.trim(),
+    brand: nextProduct.brand.trim(),
+    badge: nextProduct.badge?.trim() || undefined,
+    details: {
+      overview: nextProduct.details.overview.trim(),
+      highlights: nextProduct.details.highlights.map((item) => item.trim()).filter(Boolean),
+      specifications: nextProduct.details.specifications
+        .map((item) => ({
+          label: item.label.trim(),
+          value: item.value.trim(),
+        }))
+        .filter((item) => item.label && item.value),
+      included: nextProduct.details.included.map((item) => item.trim()).filter(Boolean),
+    },
+  };
+
+  const existingIndex = database.products.findIndex(
+    (product) => product.id.trim().toLowerCase() === normalizedProductId
+  );
+
+  const nextProducts = [...database.products];
+
+  if (existingIndex === -1) {
+    nextProducts.push(sanitizedProduct);
+  } else {
+    nextProducts[existingIndex] = sanitizedProduct;
+  }
+
+  return saveCatalogDatabase(
+    sortCatalogDatabase({
+      ...database,
+      products: nextProducts,
+    })
+  );
+}
+
+export async function removeCatalogProduct(productId: string) {
+  const database = await loadCatalogDatabase();
+  const normalizedProductId = productId.trim().toLowerCase();
+
+  return saveCatalogDatabase({
+    ...database,
+    products: database.products.filter(
+      (product) => product.id.trim().toLowerCase() !== normalizedProductId
+    ),
+  });
 }

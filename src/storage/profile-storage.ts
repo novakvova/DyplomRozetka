@@ -66,6 +66,10 @@ async function loadProfiles() {
   }
 }
 
+export async function loadAllProfiles() {
+  return loadProfiles();
+}
+
 export async function loadUserProfile(email: string) {
   const profiles = await loadProfiles();
   const normalizedEmail = email.trim().toLowerCase();
@@ -94,4 +98,13 @@ export async function saveUserProfile(profile: UserProfile) {
   const updatedProfiles = [...profiles];
   updatedProfiles[profileIndex] = nextProfile;
   await AsyncStorage.setItem(PROFILES_STORAGE_KEY, JSON.stringify(updatedProfiles));
+}
+
+export async function deleteUserProfile(email: string) {
+  const profiles = await loadProfiles();
+  const normalizedEmail = email.trim().toLowerCase();
+  const nextProfiles = profiles.filter(
+    (profile) => profile.email.trim().toLowerCase() !== normalizedEmail
+  );
+  await AsyncStorage.setItem(PROFILES_STORAGE_KEY, JSON.stringify(nextProfiles));
 }

@@ -1,10 +1,4 @@
-export type ProductCategory =
-  | 'smartphones'
-  | 'laptops'
-  | 'audio'
-  | 'gaming'
-  | 'home'
-  | 'accessories';
+export type ProductCategory = string;
 
 export type ProductItem = {
   id: string;

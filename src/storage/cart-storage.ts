@@ -66,6 +66,10 @@ async function loadCarts() {
   }
 }
 
+export async function loadAllCarts() {
+  return loadCarts();
+}
+
 export async function loadUserCart(email: string) {
   const carts = await loadCarts();
   const normalizedEmail = email.trim().toLowerCase();
@@ -235,4 +239,11 @@ export function calculateCartTotals(items: CartItem[]): CartTotals {
       subtotal: 0,
     }
   );
+}
+
+export async function deleteUserCart(email: string) {
+  const carts = await loadCarts();
+  const normalizedEmail = email.trim().toLowerCase();
+  const nextCarts = carts.filter((cart) => cart.email.trim().toLowerCase() !== normalizedEmail);
+  await AsyncStorage.setItem(CARTS_STORAGE_KEY, JSON.stringify(nextCarts));
 }

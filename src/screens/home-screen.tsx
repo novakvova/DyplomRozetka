@@ -39,7 +39,9 @@ import type {
 
 type HomeScreenProps = {
   session: AuthSession;
+  isAdmin: boolean;
   notice?: string;
+  onOpenAdmin: () => void;
   onOpenOrders: () => void;
   onOpenCart: () => void;
   onOpenProduct: (productId: string) => void;
@@ -81,7 +83,9 @@ function matchesPriceFilter(product: ProductItem, priceFilter: ProductPriceFilte
 
 export function HomeScreen({
   session,
+  isAdmin,
   notice = '',
+  onOpenAdmin,
   onOpenOrders,
   onOpenCart,
   onOpenProduct,
@@ -542,6 +546,12 @@ export function HomeScreen({
         <View style={styles.actionsGap} />
         <PrimaryButton title="Мої замовлення" onPress={onOpenOrders} variant="secondary" />
         <View style={styles.actionsGap} />
+        {isAdmin ? (
+          <>
+            <PrimaryButton title="Адмін-панель" onPress={onOpenAdmin} variant="secondary" />
+            <View style={styles.actionsGap} />
+          </>
+        ) : null}
         <PrimaryButton title="Мій профіль" onPress={onOpenProfile} variant="secondary" />
         <View style={styles.actionsGap} />
         <PrimaryButton title="Змінити пароль" onPress={onOpenChangePassword} variant="secondary" />

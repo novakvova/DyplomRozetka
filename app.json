@@ -2,6 +2,7 @@
   "expo": {
     "name": "Rozetka",
     "slug": "rozetka-team-project",
+    "scheme": "rozetka",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -9,11 +10,15 @@
       "backgroundColor": "#0c1110"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.radonnazar.rozetka"
     },
     "android": {
-      "edgeToEdgeEnabled": true
-    }
+      "edgeToEdgeEnabled": true,
+      "package": "com.radonnazar.rozetka"
+    },
+    "plugins": [
+      "expo-web-browser"
+    ]
   }
 }
-

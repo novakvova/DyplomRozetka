@@ -3,6 +3,8 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { resolveUserRole } from './src/data/admin';
+import { AdminScreen } from './src/screens/admin-screen';
 import { CartScreen } from './src/screens/cart-screen';
 import { ChangePasswordScreen } from './src/screens/change-password-screen';
 import { CheckoutScreen } from './src/screens/checkout-screen';
@@ -14,10 +16,18 @@ import { ProductDetailsScreen } from './src/screens/product-details-screen';
 import { RecoveryScreen } from './src/screens/recovery-screen';
 import { RegisterScreen } from './src/screens/register-screen';
 import { seedCatalogDatabase } from './src/storage/catalog-storage';
+import { loadUserProfile, saveUserProfile } from './src/storage/profile-storage';
 import { clearSession, loadSession, saveSession } from './src/storage/session-storage';
 import { loadRegisteredUsers, saveRegisteredUsers } from './src/storage/users-storage';
 import { colors } from './src/theme/colors';
-import type { AuthActionResult, AuthSession, RegisteredUser } from './src/types/auth';
+import type {
+  AuthActionResult,
+  AuthProvider,
+  AuthSession,
+  GoogleLoginPayload,
+  RegisteredUser,
+  UserRole,
+} from './src/types/auth';
 
 type AuthScreen = 'login' | 'register' | 'recovery';
 type CabinetScreen =
@@ -27,6 +37,7 @@ type CabinetScreen =
   | 'cart'
   | 'checkout'
   | 'orders'
+  | 'admin'
   | 'product-details';
 
 export default function App() {
@@ -37,13 +48,17 @@ export default function App() {
   const [cabinetScreen, setCabinetScreen] = useState<CabinetScreen>('home');
   const [selectedProductId, setSelectedProductId] = useState('');
   const [cabinetNotice, setCabinetNotice] = useState('');
+  const [currentUserRole, setCurrentUserRole] = useState<UserRole>('user');
   const [isHydrating, setIsHydrating] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
 
     const hydrateSession = async () => {
-      const [storedSession] = await Promise.all([loadSession(), seedCatalogDatabase()]);
+      const [storedSession, users] = await Promise.all([
+        loadSession(),
+        seedCatalogDatabase().then(() => loadRegisteredUsers()),
+      ]);
 
       if (!isMounted) {
         return;
@@ -51,6 +66,13 @@ export default function App() {
 
       setSession(storedSession);
       setLastEmail(storedSession?.email ?? '');
+      setCurrentUserRole(
+        storedSession
+          ? users.find(
+              (user) => user.email.trim().toLowerCase() === storedSession.email.trim().toLowerCase()
+            )?.role ?? resolveUserRole(storedSession.email)
+          : 'user'
+      );
       setIsHydrating(false);
     };
 
@@ -80,6 +102,14 @@ export default function App() {
       };
     }
 
+    if (!registeredUser.authMethods.includes('credentials') || !registeredUser.password) {
+      return {
+        ok: false,
+        message:
+          'Для цього акаунта налаштовано вхід через Google. Скористайтеся кнопкою Google-входу.',
+      };
+    }
+
     if (registeredUser.password !== password) {
       return {
         ok: false,
@@ -95,6 +125,7 @@ export default function App() {
     setLoginNotice('');
     setCabinetNotice('');
     setCabinetScreen('home');
+    setCurrentUserRole(registeredUser.role);
     setLastEmail(nextSession.email);
     setSession(nextSession);
     await saveSession(nextSession);
@@ -125,6 +156,8 @@ export default function App() {
     const timestamp = new Date().toISOString();
     const nextUser: RegisteredUser = {
       email: normalizedEmail,
+      authMethods: ['credentials'],
+      role: resolveUserRole(normalizedEmail),
       password,
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -140,6 +173,7 @@ export default function App() {
     setLoginNotice('');
     setCabinetNotice('');
     setCabinetScreen('home');
+    setCurrentUserRole(nextUser.role);
     setLastEmail(nextUser.email);
     setSession(nextSession);
     await saveSession(nextSession);
@@ -164,6 +198,14 @@ export default function App() {
       return {
         ok: false,
         message: 'Користувача з таким email не знайдено. Спочатку створіть акаунт.',
+      };
+    }
+
+    if (!users[userIndex].authMethods.includes('credentials') || !users[userIndex].password) {
+      return {
+        ok: false,
+        message:
+          'Для цього акаунта пароль не використовується. Увійдіть через Google замість відновлення пароля.',
       };
     }
 
@@ -216,6 +258,14 @@ export default function App() {
       };
     }
 
+    if (!users[userIndex].authMethods.includes('credentials') || !users[userIndex].password) {
+      return {
+        ok: false,
+        message:
+          'Цей акаунт працює через Google-вхід. Змінювати пароль для нього не потрібно.',
+      };
+    }
+
     if (users[userIndex].password !== currentPassword) {
       return {
         ok: false,
@@ -244,6 +294,81 @@ export default function App() {
     return { ok: true };
   };
 
+  const handleGoogleLogin = async ({
+    email,
+    fullName,
+    avatarUrl,
+    googleSubject,
+  }: GoogleLoginPayload): Promise<AuthActionResult> => {
+    const users = await loadRegisteredUsers();
+    const normalizedEmail = email.trim().toLowerCase();
+    const timestamp = new Date().toISOString();
+    const userIndex = users.findIndex(
+      (user) => user.email.trim().toLowerCase() === normalizedEmail
+    );
+
+    let nextUser: RegisteredUser;
+    let updatedUsers: RegisteredUser[];
+
+    if (userIndex === -1) {
+      nextUser = {
+        email: normalizedEmail,
+        authMethods: ['google'],
+        role: resolveUserRole(normalizedEmail),
+        fullName: fullName.trim(),
+        avatarUrl: avatarUrl?.trim() || undefined,
+        googleSubject: googleSubject?.trim() || undefined,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+      updatedUsers = [...users, nextUser];
+    } else {
+      const currentUser = users[userIndex];
+      const nextAuthMethods = Array.from(
+        new Set<AuthProvider>([...currentUser.authMethods, 'google'])
+      );
+
+      nextUser = {
+        ...currentUser,
+        authMethods: nextAuthMethods,
+        fullName: fullName.trim() || currentUser.fullName,
+        avatarUrl: avatarUrl?.trim() || currentUser.avatarUrl,
+        googleSubject: googleSubject?.trim() || currentUser.googleSubject,
+        updatedAt: timestamp,
+      };
+
+      updatedUsers = [...users];
+      updatedUsers[userIndex] = nextUser;
+    }
+
+    await saveRegisteredUsers(updatedUsers);
+
+    const storedProfile = await loadUserProfile(normalizedEmail);
+    await saveUserProfile({
+      email: normalizedEmail,
+      fullName: fullName.trim() || storedProfile?.fullName || 'Покупець Rozetka',
+      phone: storedProfile?.phone ?? '',
+      city: storedProfile?.city ?? 'Київ',
+      novaPoshta: storedProfile?.novaPoshta,
+      updatedAt: timestamp,
+    });
+
+    const nextSession: AuthSession = {
+      email: normalizedEmail,
+      loggedInAt: timestamp,
+    };
+
+    setLoginNotice('');
+    setCabinetNotice('Вхід через Google виконано успішно.');
+    setCabinetScreen('home');
+    setCurrentUserRole(nextUser.role);
+    setLastEmail(normalizedEmail);
+    setSession(nextSession);
+    await saveSession(nextSession);
+
+    return { ok: true };
+  };
+
   const handleProfileSaved = (message: string) => {
     setCabinetNotice(message);
     setCabinetScreen('home');
@@ -260,6 +385,7 @@ export default function App() {
     setLoginNotice('');
     setCabinetNotice('');
     setCabinetScreen('home');
+    setCurrentUserRole('user');
     setAuthScreen('login');
     await clearSession();
   };
@@ -304,6 +430,17 @@ export default function App() {
     setCabinetScreen('orders');
   };
 
+  const openAdmin = () => {
+    if (currentUserRole !== 'admin') {
+      setCabinetNotice('Доступ до адмін-панелі відкрито лише для адміністратора.');
+      setCabinetScreen('home');
+      return;
+    }
+
+    setCabinetNotice('');
+    setCabinetScreen('admin');
+  };
+
   const openProductDetails = (productId: string) => {
     setCabinetNotice('');
     setSelectedProductId(productId);
@@ -329,6 +466,8 @@ export default function App() {
             onBack={openCabinetHome}
             onOpenCart={openCart}
           />
+        ) : cabinetScreen === 'admin' ? (
+          <AdminScreen currentEmail={session.email} onBack={openCabinetHome} />
         ) : cabinetScreen === 'product-details' ? (
           <ProductDetailsScreen
             email={session.email}
@@ -360,7 +499,9 @@ export default function App() {
         ) : (
           <HomeScreen
             session={session}
+            isAdmin={currentUserRole === 'admin'}
             notice={cabinetNotice}
+            onOpenAdmin={openAdmin}
             onOpenOrders={openOrders}
             onOpenCart={openCart}
             onOpenProduct={openProductDetails}
@@ -387,6 +528,7 @@ export default function App() {
           initialEmail={lastEmail}
           notice={loginNotice}
           onLogin={handleLogin}
+          onGoogleLogin={handleGoogleLogin}
           onOpenRegister={openRegister}
           onOpenRecovery={openRecovery}
         />

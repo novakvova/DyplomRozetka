@@ -132,6 +132,10 @@ async function loadOrders() {
   }
 }
 
+export async function loadAllOrders() {
+  return loadOrders();
+}
+
 async function saveOrders(orders: UserOrder[]) {
   await AsyncStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
 }
@@ -185,4 +189,11 @@ export async function createUserOrder(email: string, payload: CreateOrderPayload
   await saveOrders([nextOrder, ...orders]);
 
   return nextOrder;
+}
+
+export async function deleteUserOrders(email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const orders = await loadOrders();
+  const nextOrders = orders.filter((order) => order.email.trim().toLowerCase() !== normalizedEmail);
+  await saveOrders(nextOrders);
 }
