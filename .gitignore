@@ -1,8 +1,10 @@
 node_modules
-.expo
-.expo-shared
 dist
-web-build
+backend/**/bin
+backend/**/obj
+frontend/node_modules
+frontend/dist
+frontend/tsconfig.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

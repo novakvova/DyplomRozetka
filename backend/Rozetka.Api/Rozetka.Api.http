@@ -1,0 +1,4 @@
+@Rozetka.Api_HostAddress = http://localhost:5050
+
+GET {{Rozetka.Api_HostAddress}}/api/catalog/products
+Accept: application/json
