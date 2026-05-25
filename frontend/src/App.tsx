@@ -1,18 +1,18 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { api, formatPrice } from './api/client';
-import rozetkaLogo from './assets/rozetka-logo.svg';
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { api } from './api/client';
+import { Header } from './components/Header';
+import { ProductDetailsModal } from './components/ProductDetailsModal';
+import { novaPoshta } from './data/nova-poshta';
+import { AdminPage } from './pages/AdminPage';
+import { CartPage } from './pages/CartPage';
+import { CatalogPage } from './pages/CatalogPage';
+import { FavoritesPage } from './pages/FavoritesPage';
+import { OrdersPage } from './pages/OrdersPage';
+import { ProfilePage } from './pages/ProfilePage';
 import type { AuthResponse, Cart, Category, Favorite, Order, Product, Review, User } from './types';
 
-type View = 'catalog' | 'cart' | 'favorites' | 'orders' | 'profile' | 'admin';
-type AuthMode = 'login' | 'register' | 'recover';
-
-const emptyCart: Cart = { items: [], total: 0 };
-const novaPoshta = [
-  { city: 'Київ', points: ['Відділення №12, вул. Січових Стрільців', 'Поштомат №4331, ТРЦ Gulliver'] },
-  { city: 'Львів', points: ['Відділення №7, вул. Городоцька', 'Поштомат №2104, Forum Lviv'] },
-  { city: 'Одеса', points: ['Відділення №18, вул. Дерибасівська', 'Поштомат №1190, City Center'] },
-  { city: 'Харків', points: ['Відділення №3, просп. Науки', 'Поштомат №3022, ТРЦ Nikolsky'] },
-];
+export type AuthMode = 'login' | 'register' | 'recover';
 
 type GoogleWindow = Window & {
   google?: {
@@ -28,13 +28,23 @@ type GoogleWindow = Window & {
   };
 };
 
+const emptyCart: Cart = { items: [], total: 0 };
+
 export function App() {
+  return (
+    <BrowserRouter>
+      <AppRoutes />
+    </BrowserRouter>
+  );
+}
+
+function AppRoutes() {
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(() => {
     const raw = localStorage.getItem('rozetka_fullstack_user');
     return raw ? (JSON.parse(raw) as User) : null;
   });
   const [authMode, setAuthMode] = useState<AuthMode>('login');
-  const [view, setView] = useState<View>('catalog');
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Cart>(emptyCart);
@@ -109,6 +119,7 @@ export function App() {
     setUser(response.user);
     setAuthMode('login');
     setMessage(`Вітаємо, ${response.user.fullName}!`);
+    navigate('/');
   }
 
   function saveUser(nextUser: User) {
@@ -200,6 +211,7 @@ export function App() {
   async function addToCart(productId: string) {
     if (!user) {
       setMessage('Увійдіть в акаунт, щоб додати товар у кошик.');
+      navigate('/profile');
       return;
     }
 
@@ -224,6 +236,7 @@ export function App() {
   async function toggleFavorite(productId: string) {
     if (!user) {
       setMessage('Увійдіть в акаунт, щоб додавати товари в обране.');
+      navigate('/profile');
       return;
     }
 
@@ -239,7 +252,7 @@ export function App() {
       });
       setCart(emptyCart);
       await loadOrders();
-      setView('orders');
+      navigate('/orders');
       setMessage('Замовлення оформлено.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Не вдалося оформити замовлення.');
@@ -350,305 +363,108 @@ export function App() {
     setCart(emptyCart);
     setOrders([]);
     setFavorites([]);
-    setView('catalog');
+    navigate('/');
   }
 
   return (
     <main className="min-h-screen">
-      <header className="topbar">
-        <button className="catalog-button" onClick={() => setView('catalog')}>☰ Каталог</button>
-        <button className="brand-lockup" onClick={() => setView('catalog')}>
-          <img className="brand-mark" src={rozetkaLogo} alt="Rozetka" />
-          <strong>Rozetka</strong>
-        </button>
-        <nav>
-          <button className={view === 'catalog' ? 'nav-active' : ''} onClick={() => setView('catalog')}>Товари</button>
-          <button className={view === 'favorites' ? 'nav-active' : ''} onClick={() => setView('favorites')}>Обране ({favorites.length})</button>
-          <button className={view === 'cart' ? 'nav-active' : ''} onClick={() => setView('cart')}>Кошик ({cartItemsCount})</button>
-          <button className={view === 'orders' ? 'nav-active' : ''} onClick={() => setView('orders')}>Замовлення</button>
-          {user?.role === 'Admin' && <button className={view === 'admin' ? 'nav-active' : ''} onClick={() => setView('admin')}>Адмінка</button>}
-        </nav>
-        {user ? (
-          <div className="account">
-            <button onClick={() => setView('profile')}>{user.fullName}</button>
-            <button onClick={logout}>Вийти</button>
-          </div>
-        ) : (
-          <button onClick={() => setView('profile')}>Увійти</button>
-        )}
-      </header>
-
+      <Header user={user} cartItemsCount={cartItemsCount} favoritesCount={favorites.length} onLogout={logout} />
       {message && <p className="notice">{message}</p>}
 
-      {view === 'profile' && (
-        <section className="split">
-          {!user ? (
-            <form onSubmit={submitAuth}>
-              <div className="tabs">
-                <button type="button" className={authMode === 'login' ? 'active' : ''} onClick={() => setAuthMode('login')}>Вхід</button>
-                <button type="button" className={authMode === 'register' ? 'active' : ''} onClick={() => setAuthMode('register')}>Реєстрація</button>
-                <button type="button" className={authMode === 'recover' ? 'active' : ''} onClick={() => setAuthMode('recover')}>Recovery</button>
-              </div>
-              <input name="email" type="email" placeholder="Email" defaultValue="radon.bogdan09@gmail.com" required />
-              <input name="password" type="password" placeholder={authMode === 'recover' ? 'Новий пароль' : 'Пароль'} defaultValue="Admin12345" required />
-              {authMode === 'register' && (
-                <>
-                  <input name="passwordConfirm" type="password" placeholder="Підтвердження паролю" required />
-                  <input name="fullName" placeholder="ПІБ" required />
-                  <input name="phone" placeholder="Телефон" required />
-                  <input name="city" placeholder="Місто" required />
-                </>
-              )}
-              <button className="primary">{authMode === 'recover' ? 'Оновити пароль' : authMode === 'login' ? 'Увійти' : 'Створити акаунт'}</button>
-              <button type="button" onClick={googleLogin}>Увійти через Google</button>
-            </form>
-          ) : (
-            <>
-              <form onSubmit={updateProfile}>
-                <h1>Профіль</h1>
-                <input name="fullName" defaultValue={user.fullName} placeholder="ПІБ" required />
-                <input name="phone" defaultValue={user.phone} placeholder="Телефон" />
-                <input name="city" defaultValue={user.city} placeholder="Місто" />
-                <button className="primary">Зберегти профіль</button>
-              </form>
-              <form onSubmit={changePassword}>
-                <h2>Зміна паролю</h2>
-                <input name="currentPassword" type="password" placeholder="Поточний пароль" required />
-                <input name="newPassword" type="password" placeholder="Новий пароль" required />
-                <button>Змінити пароль</button>
-              </form>
-            </>
+      <Routes>
+        <Route
+          path="/"
+          element={(
+            <CatalogPage
+              categories={categories}
+              products={products}
+              search={search}
+              category={category}
+              loading={loading}
+              favoriteProductIds={favoriteProductIds}
+              onSearchChange={setSearch}
+              onCategoryChange={setCategory}
+              onLoadCatalog={loadCatalog}
+              onOpenProduct={openProduct}
+              onAddToCart={addToCart}
+              onToggleFavorite={toggleFavorite}
+            />
           )}
-        </section>
-      )}
-
-      {view === 'catalog' && (
-        <section>
-          <div className="storefront-tools">
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Пошук товарів" />
-            <button onClick={loadCatalog}>Знайти</button>
-          </div>
-
-          <div className="category-strip">
-            <button className={!category ? 'pill-active' : ''} onClick={() => setCategory('')}>Усі товари</button>
-            {categories.map((item) => (
-              <button key={item.id} className={category === item.slug ? 'pill-active' : ''} onClick={() => setCategory(item.slug)}>
-                {item.title}
-              </button>
-            ))}
-          </div>
-          {loading && <p>Завантаження...</p>}
-          <ProductGrid products={products} favoriteProductIds={favoriteProductIds} onOpen={openProduct} onAddToCart={addToCart} onToggleFavorite={toggleFavorite} />
-        </section>
-      )}
-
-      {view === 'favorites' && (
-        <section>
-          <h1>Обране</h1>
-          {!user ? <p>Увійдіть, щоб бачити обрані товари.</p> : <ProductGrid products={favorites.map((item) => item.product)} favoriteProductIds={favoriteProductIds} onOpen={openProduct} onAddToCart={addToCart} onToggleFavorite={toggleFavorite} />}
-        </section>
-      )}
-
-      {view === 'cart' && (
-        <section className="split">
-          <div>
-            <h1>Кошик</h1>
-            {!user && <p>Увійдіть, щоб оформити замовлення.</p>}
-            {cart.items.map((item) => (
-              <article className="row" key={item.id}>
-                <strong>{item.product.title}</strong>
-                <span>{formatPrice(item.product.price)}</span>
-                <input type="number" min="1" value={item.quantity} onChange={(event) => updateCartItem(item.id, item.product.id, Number(event.target.value))} />
-                <button onClick={() => removeCartItem(item.id)}>Видалити</button>
-              </article>
-            ))}
-            <h2>Разом: {formatPrice(cart.total)}</h2>
-          </div>
-          {user && (
-            <form onSubmit={checkout}>
-              <h2>Оформлення</h2>
-              <input name="recipientFullName" placeholder="ПІБ отримувача" defaultValue={user.fullName} required />
-              <input name="recipientPhone" placeholder="Телефон" defaultValue={user.phone} required />
-              <select name="city" value={deliveryCity} onChange={(event) => setDeliveryCity(event.target.value)}>
-                {novaPoshta.map((item) => <option key={item.city} value={item.city}>{item.city}</option>)}
-              </select>
-              <select name="deliveryPoint">
-                {selectedCity.points.map((point) => <option key={point} value={point}>{point}</option>)}
-              </select>
-              <select name="paymentMethod" defaultValue="card">
-                <option value="card">Карткою</option>
-                <option value="cash">Післяплата</option>
-                <option value="installments">Оплата частинами</option>
-              </select>
-              <textarea name="comment" placeholder="Коментар" />
-              <button className="primary" disabled={cart.items.length === 0}>Оформити замовлення</button>
-            </form>
+        />
+        <Route
+          path="/favorites"
+          element={(
+            <FavoritesPage
+              user={user}
+              favorites={favorites}
+              favoriteProductIds={favoriteProductIds}
+              onOpenProduct={openProduct}
+              onAddToCart={addToCart}
+              onToggleFavorite={toggleFavorite}
+            />
           )}
-        </section>
-      )}
-
-      {view === 'orders' && (
-        <section>
-          <h1>Мої замовлення</h1>
-          {!user && <p>Увійдіть, щоб переглянути історію замовлень.</p>}
-          {orders.map((order) => (
-            <article className="order" key={order.id}>
-              <strong>{order.number}</strong>
-              <span>{formatPrice(order.total)} · {order.status}</span>
-              <p>{order.city}, {order.deliveryPoint}</p>
-              {order.items.map((item) => <small key={item.id}>{item.productTitle} x {item.quantity}</small>)}
-            </article>
-          ))}
-        </section>
-      )}
-
-      {view === 'admin' && user?.role === 'Admin' && (
-        <section className="admin-grid">
-          <form onSubmit={createProduct}>
-            <h2>Додати товар</h2>
-            <input name="sku" placeholder="SKU" required />
-            <input name="title" placeholder="Назва" required />
-            <input name="subtitle" placeholder="Короткий опис" required />
-            <input name="brand" placeholder="Бренд" required />
-            <input name="price" type="number" placeholder="Ціна" required />
-            <input name="previousPrice" type="number" placeholder="Стара ціна" />
-            <input name="badge" placeholder="Бейдж" />
-            <input name="imageUrl" placeholder="URL зображення" defaultValue="https://placehold.co/640x480/f5f7fb/1f2937?text=Rozetka" />
-            <input name="manufacturerUrl" placeholder="Офіційний сайт виробника" />
-            <textarea name="specifications" placeholder="Характеристики" defaultValue="Гарантія: 12 місяців" />
-            <textarea name="description" placeholder="Опис товару" />
-            <input name="stockQuantity" type="number" placeholder="Залишок" defaultValue="10" required />
-            <select name="categoryId" required>
-              {categories.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
-            </select>
-            <button className="primary">Зберегти товар</button>
-          </form>
-
-          <div className="panel">
-            <h2>Список товарів</h2>
-            {products.map((item) => (
-              <article className="row" key={item.id}>
-                <strong>{item.title}</strong>
-                <span>{item.category.title}</span>
-                <button onClick={() => deleteProduct(item.id)}>Видалити</button>
-              </article>
-            ))}
-          </div>
-
-          <form onSubmit={createCategory}>
-            <h2>Категорії</h2>
-            <input name="slug" placeholder="slug" required />
-            <input name="title" placeholder="Назва категорії" required />
-            <textarea name="description" placeholder="Опис" />
-            <button>Додати категорію</button>
-            {categories.map((item) => <small key={item.id}>{item.title} · {item.slug}</small>)}
-          </form>
-
-          <div className="panel">
-            <h2>Користувачі</h2>
-            {users.map((item) => (
-              <article className="row" key={item.id}>
-                <strong>{item.email}</strong>
-                <span>{item.role}{item.isBlocked ? ' · blocked' : ''}</span>
-                <button onClick={() => toggleUserBlock(item.id)}>{item.isBlocked ? 'Розблокувати' : 'Блокувати'}</button>
-                <button onClick={() => toggleUserRole(item.id)}>Змінити роль</button>
-              </article>
-            ))}
-          </div>
-
-          <form onSubmit={createAdmin}>
-            <h2>Новий адміністратор</h2>
-            <input name="email" type="email" placeholder="Email" required />
-            <input name="password" type="password" placeholder="Пароль" required />
-            <input name="fullName" placeholder="ПІБ" required />
-            <input name="phone" placeholder="Телефон" />
-            <input name="city" placeholder="Місто" />
-            <button>Додати адміністратора</button>
-          </form>
-        </section>
-      )}
+        />
+        <Route
+          path="/cart"
+          element={(
+            <CartPage
+              user={user}
+              cart={cart}
+              deliveryCity={deliveryCity}
+              selectedCity={selectedCity}
+              onDeliveryCityChange={setDeliveryCity}
+              onCheckout={checkout}
+              onUpdateCartItem={updateCartItem}
+              onRemoveCartItem={removeCartItem}
+            />
+          )}
+        />
+        <Route path="/orders" element={<OrdersPage user={user} orders={orders} />} />
+        <Route
+          path="/profile"
+          element={(
+            <ProfilePage
+              user={user}
+              authMode={authMode}
+              onAuthModeChange={setAuthMode}
+              onSubmitAuth={submitAuth}
+              onGoogleLogin={googleLogin}
+              onUpdateProfile={updateProfile}
+              onChangePassword={changePassword}
+            />
+          )}
+        />
+        <Route
+          path="/admin"
+          element={user?.role === 'Admin' ? (
+            <AdminPage
+              categories={categories}
+              products={products}
+              users={users}
+              onCreateProduct={createProduct}
+              onDeleteProduct={deleteProduct}
+              onCreateCategory={createCategory}
+              onCreateAdmin={createAdmin}
+              onToggleUserBlock={toggleUserBlock}
+              onToggleUserRole={toggleUserRole}
+            />
+          ) : <Navigate to="/" replace />}
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
 
       {selectedProduct && (
-        <section className="product-details">
-          <button onClick={() => setSelectedProduct(null)}>Закрити</button>
-          <div className="details-layout">
-            <img src={selectedProduct.imageUrl} alt={selectedProduct.title} />
-            <div>
-              <span className="badge">{selectedProduct.badge}</span>
-              <h1>{selectedProduct.title}</h1>
-              <p>{selectedProduct.description}</p>
-              <h2>{formatPrice(selectedProduct.price)}</h2>
-              <p>{selectedProduct.brand} · ★ {selectedProduct.rating.toFixed(1)} · {selectedProduct.reviewsCount} відгуків</p>
-              <pre>{selectedProduct.specifications}</pre>
-              {selectedProduct.manufacturerUrl && <a href={selectedProduct.manufacturerUrl} target="_blank" rel="noreferrer">Офіційний сайт виробника</a>}
-              <div className="action-row">
-                <button className="primary" onClick={() => addToCart(selectedProduct.id)}>До кошика</button>
-                <button onClick={() => toggleFavorite(selectedProduct.id)}>{favoriteProductIds.has(selectedProduct.id) ? 'В обраному' : 'В обране'}</button>
-              </div>
-            </div>
-          </div>
-          <div className="reviews">
-            <h2>Відгуки</h2>
-            {user && (
-              <form onSubmit={createReview}>
-                <select name="rating" defaultValue="5">
-                  <option value="5">5 зірок</option>
-                  <option value="4">4 зірки</option>
-                  <option value="3">3 зірки</option>
-                  <option value="2">2 зірки</option>
-                  <option value="1">1 зірка</option>
-                </select>
-                <textarea name="text" placeholder="Ваш відгук" required />
-                <button>Надіслати відгук</button>
-              </form>
-            )}
-            {reviews.map((review) => (
-              <article className="review" key={review.id}>
-                <strong>{review.userFullName} · ★ {review.rating}</strong>
-                <p>{review.text}</p>
-              </article>
-            ))}
-          </div>
-        </section>
+        <ProductDetailsModal
+          user={user}
+          product={selectedProduct}
+          reviews={reviews}
+          isFavorite={favoriteProductIds.has(selectedProduct.id)}
+          onClose={() => setSelectedProduct(null)}
+          onAddToCart={addToCart}
+          onToggleFavorite={toggleFavorite}
+          onCreateReview={createReview}
+        />
       )}
     </main>
-  );
-}
-
-function ProductGrid({
-  products,
-  favoriteProductIds,
-  onOpen,
-  onAddToCart,
-  onToggleFavorite,
-}: {
-  products: Product[];
-  favoriteProductIds: Set<string>;
-  onOpen: (product: Product) => void;
-  onAddToCart: (productId: string) => void;
-  onToggleFavorite: (productId: string) => void;
-}) {
-  return (
-    <div className="grid">
-      {products.map((product) => (
-        <article className="product" key={product.id}>
-          <button className="favorite-button" onClick={() => onToggleFavorite(product.id)}>
-            {favoriteProductIds.has(product.id) ? '♥' : '♡'}
-          </button>
-          <div className="product-media" onClick={() => onOpen(product)}>
-            <img src={product.imageUrl} alt={product.title} />
-          </div>
-          <span className="badge">{product.badge}</span>
-          <h2 onClick={() => onOpen(product)}>{product.title}</h2>
-          <p>{product.subtitle}</p>
-          <div className="price-line">
-            <strong>{formatPrice(product.price)}</strong>
-            {product.previousPrice ? <small>{formatPrice(product.previousPrice)}</small> : null}
-          </div>
-          <small>{product.brand} · {product.category.title} · ★ {product.rating.toFixed(1)}</small>
-          <button className="primary" onClick={() => onAddToCart(product.id)}>До кошика</button>
-        </article>
-      ))}
-    </div>
   );
 }
