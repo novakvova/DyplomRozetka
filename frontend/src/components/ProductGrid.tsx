@@ -14,7 +14,7 @@ export function ProductGrid({ products, favoriteProductIds, onOpen, onAddToCart,
     <div className="grid">
       {products.map((product) => (
         <article className="product" key={product.id}>
-          <button className="favorite-button" onClick={() => onToggleFavorite(product.id)}>
+          <button className="favorite-button" type="button" onClick={() => onToggleFavorite(product.id)}>
             {favoriteProductIds.has(product.id) ? '♥' : '♡'}
           </button>
           <div className="product-media" onClick={() => onOpen(product)}>
@@ -28,7 +28,7 @@ export function ProductGrid({ products, favoriteProductIds, onOpen, onAddToCart,
             {product.previousPrice ? <small>{formatPrice(product.previousPrice)}</small> : null}
           </div>
           <small>{product.brand} · {product.category.title} · ★ {product.rating.toFixed(1)}</small>
-          <button className="primary" onClick={() => onAddToCart(product.id)}>До кошика</button>
+          <button className="primary" type="button" onClick={() => onAddToCart(product.id)}>До кошика</button>
         </article>
       ))}
     </div>

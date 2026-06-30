@@ -17,6 +17,12 @@ public class CartController(AppDbContext db) : ControllerBase
     public async Task<CartDto> Get()
     {
         var userId = CurrentUser.GetUserId(User);
+        if (!await UserExists(userId))
+        {
+            Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return new CartDto([], 0);
+        }
+
         var items = await LoadCart(userId).ToListAsync();
         return items.ToCartDto();
     }
@@ -25,6 +31,11 @@ public class CartController(AppDbContext db) : ControllerBase
     public async Task<ActionResult<CartDto>> Add(CartItemRequest request)
     {
         var userId = CurrentUser.GetUserId(User);
+        if (!await UserExists(userId))
+        {
+            return Unauthorized("Сесія застаріла. Увійдіть ще раз.");
+        }
+
         var product = await db.Products.FindAsync(request.ProductId);
 
         if (product is null)
@@ -52,6 +63,11 @@ public class CartController(AppDbContext db) : ControllerBase
     public async Task<ActionResult<CartDto>> Update(Guid id, CartItemRequest request)
     {
         var userId = CurrentUser.GetUserId(User);
+        if (!await UserExists(userId))
+        {
+            return Unauthorized("Сесія застаріла. Увійдіть ще раз.");
+        }
+
         var item = await db.CartItems.SingleOrDefaultAsync(cartItem => cartItem.Id == id && cartItem.UserId == userId);
 
         if (item is null)
@@ -68,6 +84,11 @@ public class CartController(AppDbContext db) : ControllerBase
     public async Task<ActionResult<CartDto>> Delete(Guid id)
     {
         var userId = CurrentUser.GetUserId(User);
+        if (!await UserExists(userId))
+        {
+            return Unauthorized("Сесія застаріла. Увійдіть ще раз.");
+        }
+
         var item = await db.CartItems.SingleOrDefaultAsync(cartItem => cartItem.Id == id && cartItem.UserId == userId);
 
         if (item is not null)
@@ -84,4 +105,7 @@ public class CartController(AppDbContext db) : ControllerBase
             .Include(item => item.Product)!.ThenInclude(item => item!.Category)
             .Where(item => item.UserId == userId)
             .OrderBy(item => item.Product!.Title);
+
+    private Task<bool> UserExists(Guid userId) =>
+        db.Users.AnyAsync(item => item.Id == userId);
 }

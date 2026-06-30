@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
-import { api } from './api/client';
+import { ApiError, api } from './api/client';
 import { Header } from './components/Header';
 import { ProductDetailsModal } from './components/ProductDetailsModal';
 import { novaPoshta } from './data/nova-poshta';
@@ -64,6 +64,24 @@ function AppRoutes() {
   const selectedCity = novaPoshta.find((item) => item.city === deliveryCity) ?? novaPoshta[0];
 
   useEffect(() => {
+    const token = localStorage.getItem('rozetka_fullstack_token');
+    if (!token) {
+      clearAuth();
+      return;
+    }
+
+    api<User>('/auth/me')
+      .then(saveUser)
+      .catch((error) => {
+        if (isSessionError(error)) {
+          clearAuth();
+          setMessage('Сесія застаріла. Увійдіть ще раз.');
+          navigate('/profile');
+        }
+      });
+  }, []);
+
+  useEffect(() => {
     loadCatalog();
   }, [category]);
 
@@ -125,6 +143,31 @@ function AppRoutes() {
   function saveUser(nextUser: User) {
     localStorage.setItem('rozetka_fullstack_user', JSON.stringify(nextUser));
     setUser(nextUser);
+  }
+
+  function clearAuth() {
+    localStorage.removeItem('rozetka_fullstack_token');
+    localStorage.removeItem('rozetka_fullstack_user');
+    setUser(null);
+    setCart(emptyCart);
+    setOrders([]);
+    setFavorites([]);
+    setUsers([]);
+  }
+
+  function isSessionError(error: unknown) {
+    return error instanceof ApiError && (error.status === 401 || error.status === 403);
+  }
+
+  function handleActionError(error: unknown, fallback: string) {
+    if (isSessionError(error)) {
+      clearAuth();
+      setMessage('Сесія застаріла. Увійдіть ще раз.');
+      navigate('/profile');
+      return;
+    }
+
+    setMessage(error instanceof Error ? error.message : fallback);
   }
 
   async function submitAuth(event: FormEvent<HTMLFormElement>) {
@@ -215,11 +258,15 @@ function AppRoutes() {
       return;
     }
 
-    setCart(await api<Cart>('/cart/items', {
-      method: 'POST',
-      body: JSON.stringify({ productId, quantity: 1 }),
-    }));
-    setMessage('Товар додано в кошик.');
+    try {
+      setCart(await api<Cart>('/cart/items', {
+        method: 'POST',
+        body: JSON.stringify({ productId, quantity: 1 }),
+      }));
+      setMessage('Товар додано в кошик.');
+    } catch (error) {
+      handleActionError(error, 'Не вдалося додати товар у кошик.');
+    }
   }
 
   async function updateCartItem(itemId: string, productId: string, quantity: number) {
@@ -240,7 +287,12 @@ function AppRoutes() {
       return;
     }
 
-    setFavorites(await api<Favorite[]>(`/favorites/${productId}`, { method: 'POST' }));
+    try {
+      setFavorites(await api<Favorite[]>(`/favorites/${productId}`, { method: 'POST' }));
+      setMessage('Обране оновлено.');
+    } catch (error) {
+      handleActionError(error, 'Не вдалося оновити обране.');
+    }
   }
 
   async function checkout(event: FormEvent<HTMLFormElement>) {

@@ -19,7 +19,7 @@ export async function api<T>(path: string, options: RequestInit = {}) {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new ApiError(text || 'Помилка запиту до API', response.status);
+    throw new ApiError(text || defaultApiMessage(response.status), response.status);
   }
 
   if (response.status === 204) {
@@ -27,6 +27,13 @@ export async function api<T>(path: string, options: RequestInit = {}) {
   }
 
   return (await response.json()) as T;
+}
+
+function defaultApiMessage(status: number) {
+  if (status === 401) return 'Сесія застаріла. Увійдіть ще раз.';
+  if (status === 403) return 'Недостатньо прав для цієї дії.';
+  if (status === 404) return 'Запитаний ресурс не знайдено.';
+  return 'Помилка запиту до API';
 }
 
 export const formatPrice = (value: number) =>
