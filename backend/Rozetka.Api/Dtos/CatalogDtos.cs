@@ -13,6 +13,7 @@ public record ProductDto(
     double Rating,
     int ReviewsCount,
     string ImageUrl,
+    IReadOnlyList<string> ImageUrls,
     string Description,
     string ManufacturerUrl,
     string Specifications,

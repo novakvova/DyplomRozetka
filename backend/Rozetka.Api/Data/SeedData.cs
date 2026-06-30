@@ -93,7 +93,7 @@ public static class SeedData
             Rating = rating,
             ReviewsCount = reviews,
             StockQuantity = stock,
-            ImageUrl = ProductImageUrl(sku, title),
+            ImageUrl = ProductAssets.PrimaryImageUrl(sku, title),
             Description = $"{title} доступний у каталозі Rozetka. Дані зберігаються у PostgreSQL, а зміни проходять через ASP.NET Core API.",
             ManufacturerUrl = brand switch
             {
@@ -114,21 +114,7 @@ public static class SeedData
         var products = await db.Products.ToListAsync();
         foreach (var product in products)
         {
-            product.ImageUrl = ProductImageUrl(product.Sku, product.Title);
+            product.ImageUrl = ProductAssets.PrimaryImageUrl(product.Sku, product.Title);
         }
     }
-
-    private static string ProductImageUrl(string sku, string title) =>
-        sku switch
-        {
-            "iphone-15-128-black" => "https://www.apple.com/v/iphone/home/cj/images/meta/iphone__bh930eyjnj0i_og.png?202605120906",
-            "galaxy-s24-256" => "https://upload.wikimedia.org/wikipedia/commons/4/46/Samsung_Galaxy_S24_%28webtekno%29_008.png",
-            "macbook-air-m3-13" => "https://www.apple.com/v/macbook-air/z/images/meta/macbook_air_mx__ez5y0k5yy7au_og.png?202605080834",
-            "lenovo-legion-5" => "https://p3-ofp.static.pub//fes/cms/2025/12/23/1bkzaqo8wdrsxdiatq4hpq4vxiq82f191037.png?width=584&height=584",
-            "sony-wh1000xm5" => "https://d1ncau8tqf99kp.cloudfront.net/converted/103364_original_local_1200x1050_v3_converted.webp",
-            "ps5-slim" => "https://gmedia.playstation.com/is/image/SIEPDC/ps5-product-thumbnail-01-en-14sep21?$facebook$",
-            "dyson-v15" => "https://dyson-h.assetsadobe2.com/is/image/content/dam/dyson/images/products/hero/400477-01.png",
-            "anker-735" => "https://www.ankerjapan.com/cdn/shop/products/a2668_0001_A2668001_800x_cc40c8d5-f912-4679-9eb3-eaffa64f64ef_1200x1200.jpg?v=1662559209",
-            _ => $"https://placehold.co/640x480/f5f7fb/1f2937?text={Uri.EscapeDataString(title)}"
-        };
 }

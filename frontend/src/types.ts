@@ -34,6 +34,7 @@ export type Product = {
   rating: number;
   reviewsCount: number;
   imageUrl: string;
+  imageUrls: string[];
   description: string;
   manufacturerUrl: string;
   specifications: string;

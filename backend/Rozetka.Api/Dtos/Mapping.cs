@@ -1,4 +1,5 @@
 using Rozetka.Api.Models;
+using Rozetka.Api.Data;
 
 namespace Rozetka.Api.Dtos;
 
@@ -23,6 +24,7 @@ public static class Mapping
             product.Rating,
             product.ReviewsCount,
             product.ImageUrl,
+            ProductAssets.ImageUrls(product),
             product.Description,
             product.ManufacturerUrl,
             product.Specifications,

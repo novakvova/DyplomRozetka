@@ -1,4 +1,4 @@
-import { FormEvent } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { formatPrice } from '../api/client';
 import type { Product, Review, User } from '../types';
 
@@ -23,11 +23,40 @@ export function ProductDetailsModal({
   onToggleFavorite,
   onCreateReview,
 }: ProductDetailsModalProps) {
+  const gallery = useMemo(() => {
+    const urls = [product.imageUrl, ...(product.imageUrls ?? [])].filter(Boolean);
+    return Array.from(new Set(urls));
+  }, [product.imageUrl, product.imageUrls]);
+  const [activeImageUrl, setActiveImageUrl] = useState(gallery[0] ?? product.imageUrl);
+
+  useEffect(() => {
+    setActiveImageUrl(gallery[0] ?? product.imageUrl);
+  }, [gallery, product.imageUrl]);
+
   return (
     <section className="product-details">
-      <button onClick={onClose}>Закрити</button>
+      <button type="button" onClick={onClose}>Закрити</button>
       <div className="details-layout">
-        <img src={product.imageUrl} alt={product.title} />
+        <div className="product-gallery">
+          <div className="product-gallery-main">
+            <img src={activeImageUrl} alt={product.title} />
+          </div>
+          {gallery.length > 1 && (
+            <div className="product-thumbnails" aria-label="Фото товару">
+              {gallery.map((url, index) => (
+                <button
+                  className={`thumbnail-button${url === activeImageUrl ? ' active' : ''}`}
+                  key={url}
+                  type="button"
+                  onClick={() => setActiveImageUrl(url)}
+                  aria-label={`Показати фото ${index + 1}`}
+                >
+                  <img src={url} alt={`${product.title} фото ${index + 1}`} />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <div>
           <span className="badge">{product.badge}</span>
           <h1>{product.title}</h1>
@@ -37,8 +66,8 @@ export function ProductDetailsModal({
           <pre>{product.specifications}</pre>
           {product.manufacturerUrl && <a href={product.manufacturerUrl} target="_blank" rel="noreferrer">Офіційний сайт виробника</a>}
           <div className="action-row">
-            <button className="primary" onClick={() => onAddToCart(product.id)}>До кошика</button>
-            <button onClick={() => onToggleFavorite(product.id)}>{isFavorite ? 'В обраному' : 'В обране'}</button>
+            <button className="primary" type="button" onClick={() => onAddToCart(product.id)}>До кошика</button>
+            <button type="button" onClick={() => onToggleFavorite(product.id)}>{isFavorite ? 'В обраному' : 'В обране'}</button>
           </div>
         </div>
       </div>
