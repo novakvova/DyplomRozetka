@@ -1,59 +1,45 @@
+import { useState } from 'react';
 import { ProductGrid } from '../components/ProductGrid';
-import type { Category, Product } from '../types';
+import { useProductActions } from '../hooks/useProductActions';
+import { useGetCategoriesQuery, useGetProductsQuery } from '../store/api/catalogApi';
+import type { Product } from '../types';
 
 type CatalogPageProps = {
-  categories: Category[];
-  products: Product[];
-  search: string;
-  category: string;
-  loading: boolean;
-  favoriteProductIds: Set<string>;
-  onSearchChange: (value: string) => void;
-  onCategoryChange: (value: string) => void;
-  onLoadCatalog: () => void;
   onOpenProduct: (product: Product) => void;
-  onAddToCart: (productId: string) => void;
-  onToggleFavorite: (productId: string) => void;
 };
 
-export function CatalogPage({
-  categories,
-  products,
-  search,
-  category,
-  loading,
-  favoriteProductIds,
-  onSearchChange,
-  onCategoryChange,
-  onLoadCatalog,
-  onOpenProduct,
-  onAddToCart,
-  onToggleFavorite,
-}: CatalogPageProps) {
+export function CatalogPage({ onOpenProduct }: CatalogPageProps) {
+  const [search, setSearch] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
+  const [category, setCategory] = useState('');
+  const { data: categories = [] } = useGetCategoriesQuery();
+  const { data: products = [], isFetching } = useGetProductsQuery({ search: appliedSearch, category });
+  const { favoriteProductIds, addToCart, toggleFavorite } = useProductActions();
+
   return (
-    <section>
-      <div className="storefront-tools">
-        <input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Пошук товарів" />
-        <button onClick={onLoadCatalog}>Знайти</button>
-      </div>
+      <section>
+        <div className="storefront-tools">
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Пошук товарів" />
+          <button onClick={() => setAppliedSearch(search)}>Знайти</button>
+        </div>
 
-      <div className="category-strip">
-        <button className={!category ? 'pill-active' : ''} onClick={() => onCategoryChange('')}>Усі товари</button>
-        {categories.map((item) => (
-          <button key={item.id} className={category === item.slug ? 'pill-active' : ''} onClick={() => onCategoryChange(item.slug)}>
-            {item.title}
-          </button>
-        ))}
-      </div>
+        <div className="category-strip">
+          <button className={!category ? 'pill-active' : ''} onClick={() => setCategory('')}>Усі товари</button>
+          {categories.map((item) => (
+              <button key={item.id} className={category === item.slug ? 'pill-active' : ''} onClick={() => setCategory(item.slug)}>
+                {item.title}
+              </button>
+          ))}
+        </div>
 
-      {loading && <p>Завантаження...</p>}
-      <ProductGrid
-        products={products}
-        favoriteProductIds={favoriteProductIds}
-        onOpen={onOpenProduct}
-        onAddToCart={onAddToCart}
-        onToggleFavorite={onToggleFavorite}
-      />
-    </section>
+        {isFetching && <p>Завантаження...</p>}
+        <ProductGrid
+            products={products}
+            favoriteProductIds={favoriteProductIds}
+            onOpen={onOpenProduct}
+            onAddToCart={addToCart}
+            onToggleFavorite={toggleFavorite}
+        />
+      </section>
   );
 }
