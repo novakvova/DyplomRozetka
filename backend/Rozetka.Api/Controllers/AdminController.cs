@@ -169,29 +169,37 @@ public class AdminController(AppDbContext db, ImageProcessingService imageProces
         return NoContent();
     }
 
-    [HttpPost("products/{id:guid}/images")]
-    [RequestSizeLimit(10_485_760)]
-    public async Task<ActionResult<IReadOnlyList<ProductImageDto>>> UploadImages(Guid id, [FromForm] IFormFileCollection files, CancellationToken cancellationToken)
+    public class ModelUploadImage
     {
-        var product = await db.Products.Include(item => item.Images).SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+        public Guid Id { get; set; }
+        [FromForm]
+        public IFormFileCollection Files { get; set; }
+    }
+
+    [HttpPost("products/images")]
+    [RequestSizeLimit(10_485_760)]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<IReadOnlyList<ProductImageDto>>> UploadImages([FromForm] ModelUploadImage model)
+    {
+        var product = await db.Products.Include(item => item.Images).SingleOrDefaultAsync(item => item.Id == model.Id);
         if (product is null)
         {
             return NotFound();
         }
 
-        if (files.Count == 0)
+        if (model.Files.Count == 0)
         {
             return BadRequest("Не передано жодного файлу.");
         }
 
         var nextSortOrder = product.Images.Count == 0 ? 0 : product.Images.Max(image => image.SortOrder) + 1;
 
-        foreach (var file in files)
+        foreach (var file in model.Files)
         {
             ProcessedImage processed;
             try
             {
-                processed = await imageProcessingService.ProcessAsync(file, cancellationToken);
+                processed = await imageProcessingService.ProcessAsync(file);
             }
             catch (InvalidOperationException ex)
             {
@@ -216,7 +224,7 @@ public class AdminController(AppDbContext db, ImageProcessingService imageProces
             product.ImageUrl = product.Images.OrderBy(image => image.SortOrder).First().LargeUrl;
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        await db.SaveChangesAsync();
         return product.Images.OrderBy(image => image.SortOrder).Select(image => image.ToDto()).ToList();
     }
 
