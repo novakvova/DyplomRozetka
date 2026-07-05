@@ -14,6 +14,7 @@ public record ProductDto(
     int ReviewsCount,
     string ImageUrl,
     IReadOnlyList<string> ImageUrls,
+    IReadOnlyList<ProductImageDto> Images,
     string Description,
     string ManufacturerUrl,
     string Specifications,

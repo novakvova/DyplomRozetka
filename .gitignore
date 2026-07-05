@@ -12,3 +12,5 @@ yarn-error.log*
 .env
 .env.*
 !.env.example
+backend/**/wwwroot/uploads/products/*
+!backend/**/wwwroot/uploads/products/.gitkeep

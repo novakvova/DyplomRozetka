@@ -20,4 +20,5 @@ public class Product
     public Guid CategoryId { get; set; }
     public Category? Category { get; set; }
     public ICollection<Review> Reviews { get; set; } = new List<Review>();
+    public ICollection<ProductImage> Images { get; set; } = new List<ProductImage>();
 }

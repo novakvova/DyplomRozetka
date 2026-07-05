@@ -19,6 +19,7 @@ public class FavoritesController(AppDbContext db) : ControllerBase
         var userId = CurrentUser.GetUserId(User);
         var favorites = await db.FavoriteItems
             .Include(item => item.Product)!.ThenInclude(item => item!.Category)
+            .Include(item => item.Product)!.ThenInclude(item => item!.Images)
             .Where(item => item.UserId == userId)
             .OrderByDescending(item => item.CreatedAt)
             .ToListAsync();
