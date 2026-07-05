@@ -25,7 +25,7 @@ public class CatalogController(AppDbContext db) : ControllerBase
         [FromQuery] string? search,
         [FromQuery] string? brand)
     {
-        var query = db.Products.Include(item => item.Category).AsQueryable();
+        var query = db.Products.Include(item => item.Category).Include(item => item.Images).AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(category))
         {
@@ -56,7 +56,7 @@ public class CatalogController(AppDbContext db) : ControllerBase
     [HttpGet("products/{id:guid}")]
     public async Task<ActionResult<ProductDto>> Product(Guid id)
     {
-        var product = await db.Products.Include(item => item.Category).SingleOrDefaultAsync(item => item.Id == id);
+        var product = await db.Products.Include(item => item.Category).Include(item => item.Images).SingleOrDefaultAsync(item => item.Id == id);
         return product is null ? NotFound() : product.ToDto();
     }
 }

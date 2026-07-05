@@ -4,13 +4,14 @@ using Microsoft.EntityFrameworkCore;
 using Rozetka.Api.Data;
 using Rozetka.Api.Dtos;
 using Rozetka.Api.Models;
+using Rozetka.Api.Services;
 
 namespace Rozetka.Api.Controllers;
 
 [Authorize(Roles = "Admin")]
 [ApiController]
 [Route("api/admin")]
-public class AdminController(AppDbContext db) : ControllerBase
+public class AdminController(AppDbContext db, ImageProcessingService imageProcessingService) : ControllerBase
 {
     [HttpGet("users")]
     public async Task<IReadOnlyList<UserDto>> Users()
@@ -142,7 +143,7 @@ public class AdminController(AppDbContext db) : ControllerBase
     [HttpPut("products/{id:guid}")]
     public async Task<ActionResult<ProductDto>> UpdateProduct(Guid id, ProductUpsertRequest request)
     {
-        var product = await db.Products.Include(item => item.Category).SingleOrDefaultAsync(item => item.Id == id);
+        var product = await db.Products.Include(item => item.Category).Include(item => item.Images).SingleOrDefaultAsync(item => item.Id == id);
         if (product is null)
         {
             return NotFound();
@@ -165,6 +166,76 @@ public class AdminController(AppDbContext db) : ControllerBase
 
         db.Products.Remove(product);
         await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpPost("products/{id:guid}/images")]
+    [RequestSizeLimit(10_485_760)]
+    public async Task<ActionResult<IReadOnlyList<ProductImageDto>>> UploadImages(Guid id, [FromForm] IFormFileCollection files, CancellationToken cancellationToken)
+    {
+        var product = await db.Products.Include(item => item.Images).SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+        if (product is null)
+        {
+            return NotFound();
+        }
+
+        if (files.Count == 0)
+        {
+            return BadRequest("Не передано жодного файлу.");
+        }
+
+        var nextSortOrder = product.Images.Count == 0 ? 0 : product.Images.Max(image => image.SortOrder) + 1;
+
+        foreach (var file in files)
+        {
+            ProcessedImage processed;
+            try
+            {
+                processed = await imageProcessingService.ProcessAsync(file, cancellationToken);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+
+            var image = new ProductImage
+            {
+                ProductId = product.Id,
+                ThumbnailUrl = processed.ThumbnailUrl,
+                MediumUrl = processed.MediumUrl,
+                LargeUrl = processed.LargeUrl,
+                SortOrder = nextSortOrder++
+            };
+
+            db.ProductImages.Add(image);
+            product.Images.Add(image);
+        }
+
+        if (string.IsNullOrWhiteSpace(product.ImageUrl))
+        {
+            product.ImageUrl = product.Images.OrderBy(image => image.SortOrder).First().LargeUrl;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return product.Images.OrderBy(image => image.SortOrder).Select(image => image.ToDto()).ToList();
+    }
+
+    [HttpDelete("products/{productId:guid}/images/{imageId:guid}")]
+    public async Task<IActionResult> DeleteImage(Guid productId, Guid imageId)
+    {
+        var image = await db.ProductImages.SingleOrDefaultAsync(item => item.Id == imageId && item.ProductId == productId);
+        if (image is null)
+        {
+            return NotFound();
+        }
+
+        db.ProductImages.Remove(image);
+        await db.SaveChangesAsync();
+
+        imageProcessingService.DeleteByUrl(image.ThumbnailUrl);
+        imageProcessingService.DeleteByUrl(image.MediumUrl);
+        imageProcessingService.DeleteByUrl(image.LargeUrl);
+
         return NoContent();
     }
 

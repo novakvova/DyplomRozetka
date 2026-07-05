@@ -103,6 +103,7 @@ public class CartController(AppDbContext db) : ControllerBase
     private IQueryable<CartItem> LoadCart(Guid userId) =>
         db.CartItems
             .Include(item => item.Product)!.ThenInclude(item => item!.Category)
+            .Include(item => item.Product)!.ThenInclude(item => item!.Images)
             .Where(item => item.UserId == userId)
             .OrderBy(item => item.Product!.Title);
 

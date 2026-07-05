@@ -8,6 +8,7 @@ public static class SeedData
     public static async Task InitializeAsync(AppDbContext db)
     {
         await db.Database.EnsureCreatedAsync();
+        await EnsureProductImagesTableAsync(db);
 
         if (!await db.Users.AnyAsync())
         {
@@ -116,5 +117,21 @@ public static class SeedData
         {
             product.ImageUrl = ProductAssets.PrimaryImageUrl(product.Sku, product.Title);
         }
+    }
+
+    private static async Task EnsureProductImagesTableAsync(AppDbContext db)
+    {
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS "ProductImages" (
+                "Id" uuid NOT NULL PRIMARY KEY,
+                "ProductId" uuid NOT NULL,
+                "ThumbnailUrl" varchar(500) NOT NULL,
+                "MediumUrl" varchar(500) NOT NULL,
+                "LargeUrl" varchar(500) NOT NULL,
+                "SortOrder" integer NOT NULL,
+                "CreatedAt" timestamp with time zone NOT NULL,
+                CONSTRAINT "FK_ProductImages_Products_ProductId" FOREIGN KEY ("ProductId") REFERENCES "Products" ("Id") ON DELETE CASCADE
+            );
+            """);
     }
 }

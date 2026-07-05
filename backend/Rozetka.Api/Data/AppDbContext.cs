@@ -13,6 +13,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -108,6 +109,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .WithMany()
                 .HasForeignKey(item => item.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProductImage>(entity =>
+        {
+            entity.Property(item => item.ThumbnailUrl).HasMaxLength(500);
+            entity.Property(item => item.MediumUrl).HasMaxLength(500);
+            entity.Property(item => item.LargeUrl).HasMaxLength(500);
+            entity.HasOne(item => item.Product)
+                .WithMany(item => item.Images)
+                .HasForeignKey(item => item.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
