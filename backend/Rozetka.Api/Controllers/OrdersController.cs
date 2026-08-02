@@ -11,29 +11,33 @@ namespace Rozetka.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/orders")]
-public class OrdersController(AppDbContext db) : ControllerBase
+public class OrdersController(AppDbContext db) 
+    : ControllerBase
 {
     [HttpGet]
-    public async Task<IReadOnlyList<OrderDto>> Get()
+    public async Task<IReadOnlyList<OrderDto>> Get
+        (CancellationToken cancellationToken)
     {
         var userId = CurrentUser.GetUserId(User);
+
         var orders = await db.Orders
             .Include(item => item.Items)
             .Where(item => item.UserId == userId)
             .OrderByDescending(item => item.CreatedAt)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         return orders.Select(item => item.ToDto()).ToList();
     }
 
     [HttpPost("checkout")]
-    public async Task<ActionResult<OrderDto>> Checkout(CheckoutRequest request)
+    public async Task<ActionResult<OrderDto>> Checkout
+        (CheckoutRequest request, CancellationToken cancellationToken)
     {
         var userId = CurrentUser.GetUserId(User);
         var cart = await db.CartItems
             .Include(item => item.Product)
             .Where(item => item.UserId == userId)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         if (cart.Count == 0)
         {
@@ -41,6 +45,7 @@ public class OrdersController(AppDbContext db) : ControllerBase
         }
 
         var now = DateTime.UtcNow;
+
         var order = new Order
         {
             Number = $"RZ-{now:yyMMdd-HHmmss}",
@@ -64,7 +69,7 @@ public class OrdersController(AppDbContext db) : ControllerBase
 
         db.Orders.Add(order);
         db.CartItems.RemoveRange(cart);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
 
         return order.ToDto();
     }
