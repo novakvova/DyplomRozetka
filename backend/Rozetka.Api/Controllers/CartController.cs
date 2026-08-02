@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Rozetka.Api.Common;
 using Rozetka.Api.Data;
 using Rozetka.Api.Dtos;
 using Rozetka.Api.Models;
@@ -14,90 +15,128 @@ namespace Rozetka.Api.Controllers;
 public class CartController(AppDbContext db) : ControllerBase
 {
     [HttpGet]
-    public async Task<CartDto> Get()
+    public async Task<CartDto> Get
+        (CancellationToken cancellationToken)
     {
         var userId = CurrentUser.GetUserId(User);
-        if (!await UserExists(userId))
+
+        if (!await UserExists(userId, cancellationToken))
         {
             Response.StatusCode = StatusCodes.Status401Unauthorized;
             return new CartDto([], 0);
         }
 
-        var items = await LoadCart(userId).ToListAsync();
+        var items = await LoadCart(userId).ToListAsync(cancellationToken);
         return items.ToCartDto();
     }
 
     [HttpPost("items")]
-    public async Task<ActionResult<CartDto>> Add(CartItemRequest request)
+    public async Task<ActionResult<CartDto>> Add
+        (CartItemRequest request, CancellationToken cancellationToken)
     {
         var userId = CurrentUser.GetUserId(User);
-        if (!await UserExists(userId))
+
+        if (!await UserExists(userId, cancellationToken))
         {
-            return Unauthorized("Сесія застаріла. Увійдіть ще раз.");
+            return Unauthorized(ErrorMessages.SessionExpired);
         }
 
-        var product = await db.Products.FindAsync(request.ProductId);
+        var product = await db.Products.SingleOrDefaultAsync
+            (item => item.Id == request.ProductId, cancellationToken);
 
         if (product is null)
         {
-            return NotFound("Товар не знайдено.");
+            return NotFound(ErrorMessages.ProductNotFound);
         }
 
-        var quantity = Math.Clamp(request.Quantity, 1, 99);
-        var existing = await db.CartItems.SingleOrDefaultAsync(item => item.UserId == userId && item.ProductId == request.ProductId);
+        var quantity = Math.Clamp(request.Quantity, 
+            ValidationConstants.MinCartLength, 
+            ValidationConstants.MaxCartLength);
+
+        var existing = await db.CartItems.SingleOrDefaultAsync
+            (item => item.UserId == userId && item.ProductId == 
+            request.ProductId, cancellationToken);
+
 
         if (existing is null)
         {
-            db.CartItems.Add(new CartItem { UserId = userId, ProductId = request.ProductId, Quantity = quantity });
+            db.CartItems.Add(new CartItem 
+            { 
+                UserId = userId, 
+                ProductId = request.ProductId,
+                Quantity = quantity 
+            });
         }
         else
         {
-            existing.Quantity = Math.Clamp(existing.Quantity + quantity, 1, 99);
+            existing.Quantity = Math.Clamp
+                (existing.Quantity + quantity, 
+                ValidationConstants.MinCartLength, 
+                ValidationConstants.MaxCartLength);
         }
 
-        await db.SaveChangesAsync();
-        return (await LoadCart(userId).ToListAsync()).ToCartDto();
+        await db.SaveChangesAsync(cancellationToken);
+
+        return (await LoadCart(userId)
+            .ToListAsync(cancellationToken))
+            .ToCartDto();
     }
 
     [HttpPut("items/{id:guid}")]
-    public async Task<ActionResult<CartDto>> Update(Guid id, CartItemRequest request)
+    public async Task<ActionResult<CartDto>> Update
+        (Guid id, CartItemRequest request, CancellationToken cancellationToken)
     {
         var userId = CurrentUser.GetUserId(User);
-        if (!await UserExists(userId))
+
+        if (!await UserExists(userId, cancellationToken))
         {
-            return Unauthorized("Сесія застаріла. Увійдіть ще раз.");
+            return Unauthorized(ErrorMessages.SessionExpired);
         }
 
-        var item = await db.CartItems.SingleOrDefaultAsync(cartItem => cartItem.Id == id && cartItem.UserId == userId);
+        var item = await db.CartItems.SingleOrDefaultAsync
+            (cartItem => cartItem.Id == id && cartItem.UserId == userId, cancellationToken);
 
         if (item is null)
         {
             return NotFound();
         }
 
-        item.Quantity = Math.Clamp(request.Quantity, 1, 99);
-        await db.SaveChangesAsync();
-        return (await LoadCart(userId).ToListAsync()).ToCartDto();
+        item.Quantity = Math.Clamp
+            (request.Quantity, 
+            ValidationConstants.MinCartLength,
+            ValidationConstants.MaxCartLength);
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        return (await LoadCart(userId)
+            .ToListAsync(cancellationToken))
+            .ToCartDto();
     }
 
     [HttpDelete("items/{id:guid}")]
-    public async Task<ActionResult<CartDto>> Delete(Guid id)
+    public async Task<ActionResult<CartDto>> Delete
+        (Guid id, CancellationToken cancellationToken)
     {
         var userId = CurrentUser.GetUserId(User);
-        if (!await UserExists(userId))
+
+        if (!await UserExists(userId, cancellationToken))
         {
-            return Unauthorized("Сесія застаріла. Увійдіть ще раз.");
+            return Unauthorized(ErrorMessages.SessionExpired);
         }
 
-        var item = await db.CartItems.SingleOrDefaultAsync(cartItem => cartItem.Id == id && cartItem.UserId == userId);
+        var item = await db.CartItems.SingleOrDefaultAsync
+            (cartItem => cartItem.Id == id && cartItem.UserId == userId, 
+            cancellationToken);
 
         if (item is not null)
         {
             db.CartItems.Remove(item);
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(cancellationToken);
         }
 
-        return (await LoadCart(userId).ToListAsync()).ToCartDto();
+        return (await LoadCart(userId)
+            .ToListAsync(cancellationToken))
+            .ToCartDto();
     }
 
     private IQueryable<CartItem> LoadCart(Guid userId) =>
@@ -107,6 +146,7 @@ public class CartController(AppDbContext db) : ControllerBase
             .Where(item => item.UserId == userId)
             .OrderBy(item => item.Product!.Title);
 
-    private Task<bool> UserExists(Guid userId) =>
-        db.Users.AnyAsync(item => item.Id == userId);
+    private Task<bool> UserExists
+        (Guid userId, CancellationToken cancellationToken) =>
+        db.Users.AnyAsync(item => item.Id == userId, cancellationToken);
 }

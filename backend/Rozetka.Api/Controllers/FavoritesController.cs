@@ -11,38 +11,46 @@ namespace Rozetka.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/favorites")]
-public class FavoritesController(AppDbContext db) : ControllerBase
+public class FavoritesController(AppDbContext db) 
+    : ControllerBase
 {
     [HttpGet]
-    public async Task<IReadOnlyList<FavoriteDto>> Get()
+    public async Task<IReadOnlyList<FavoriteDto>> Get
+        (CancellationToken cancellationToken)
     {
         var userId = CurrentUser.GetUserId(User);
+
         var favorites = await db.FavoriteItems
             .Include(item => item.Product)!.ThenInclude(item => item!.Category)
             .Include(item => item.Product)!.ThenInclude(item => item!.Images)
             .Where(item => item.UserId == userId)
             .OrderByDescending(item => item.CreatedAt)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         return favorites.Select(item => item.ToDto()).ToList();
     }
 
     [HttpPost("{productId:guid}")]
-    public async Task<IReadOnlyList<FavoriteDto>> Toggle(Guid productId)
+    public async Task<IReadOnlyList<FavoriteDto>> Toggle
+        (Guid productId, CancellationToken cancellationToken)
     {
         var userId = CurrentUser.GetUserId(User);
-        var existing = await db.FavoriteItems.SingleOrDefaultAsync(item => item.UserId == userId && item.ProductId == productId);
+
+        var existing = await db.FavoriteItems.SingleOrDefaultAsync
+            (item => item.UserId == userId && item.ProductId == productId, 
+            cancellationToken);
 
         if (existing is null)
         {
-            db.FavoriteItems.Add(new FavoriteItem { UserId = userId, ProductId = productId });
+            db.FavoriteItems.Add(new FavoriteItem 
+            { UserId = userId, ProductId = productId });
         }
         else
         {
             db.FavoriteItems.Remove(existing);
         }
 
-        await db.SaveChangesAsync();
-        return await Get();
+        await db.SaveChangesAsync(cancellationToken);
+        return await Get(cancellationToken);
     }
 }

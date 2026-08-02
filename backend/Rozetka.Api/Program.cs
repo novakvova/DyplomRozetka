@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Rozetka.Api.Data;
+using Rozetka.Api.Middleware;
+using Rozetka.Api.Options;
 using Rozetka.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +17,8 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<ImageProcessingExceptionHandler>();
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer((document, context, cancellationToken) =>
@@ -60,16 +64,34 @@ builder.Services.AddSingleton<ImageProcessingService>();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
+builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
+
+var corsOptions = builder.Configuration
+    .GetSection(FrontendCorsOptions.SectionName)
+    .Get<FrontendCorsOptions>()
+
+    ?? new FrontendCorsOptions();
+
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("Frontend", policy =>
-        policy.WithOrigins("http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:5173", "http://127.0.0.1:5174")
+options.AddPolicy(FrontendCorsOptions.PolicyName, policy =>
+    {
+        policy.WithOrigins(corsOptions.AllowedOrigins)
             .AllowAnyHeader()
-            .AllowAnyMethod());
+            .AllowAnyMethod();
+    });
 });
 
-var jwt = builder.Configuration.GetSection("Jwt");
-var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"]!));
+var jwtOptions = builder.Configuration
+    .GetSection(JwtOptions.SectionName)
+    .Get<JwtOptions>()
+
+    ?? throw new InvalidOperationException("Розділ конфігурації JwtOptions не знайдено");
+
+var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key));
+
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -82,18 +104,17 @@ builder.Services
             ValidateIssuer = false,
             ValidateAudience = false,
             ValidateIssuerSigningKey = true,
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero,
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+            ValidateLifetime = false,
+            RequireExpirationTime = false,
+            IssuerSigningKey = signingKey
         };
     });
 
 builder.Services.AddAuthorization();
 
-builder.Services.AddOpenApi();
-
 var app = builder.Build();
+
+app.UseExceptionHandler();
 
 app.MapOpenApi();
 
@@ -110,9 +131,12 @@ app.UseStaticFiles(new StaticFileOptions
 {
     ContentTypeProvider = staticFileContentTypeProvider
 });
-app.UseCors("Frontend");
+
+app.UseCors(FrontendCorsOptions.PolicyName);
+
 app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
 
 using (var scope = app.Services.CreateScope())

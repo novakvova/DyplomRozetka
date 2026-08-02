@@ -1,4 +1,5 @@
 ﻿using SkiaSharp;
+using Rozetka.Api.Common;
 
 namespace Rozetka.Api.Services;
 
@@ -6,7 +7,6 @@ public record ProcessedImage(string ThumbnailUrl, string MediumUrl, string Large
 
 public class ImageProcessingService(IWebHostEnvironment environment)
 {
-    private const long MaxFileSizeBytes = 10 * 1024 * 1024;
     private const int WebpQuality = 82;
 
     private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
@@ -31,14 +31,16 @@ public class ImageProcessingService(IWebHostEnvironment environment)
         ("large", 1280)
     };
 
-    public async Task<ProcessedImage> ProcessAsync(IFormFile file, CancellationToken cancellationToken = default)
+    public async Task<ProcessedImage> ProcessAsync
+        (IFormFile file, 
+        CancellationToken cancellationToken = default)
     {
         if (file.Length == 0)
         {
             throw new InvalidOperationException("Файл порожній.");
         }
 
-        if (file.Length > MaxFileSizeBytes)
+        if (file.Length > ValidationConstants.MaxProductImageBytes)
         {
             throw new InvalidOperationException("Файл завеликий (максимум 10 МБ).");
         }
@@ -48,7 +50,9 @@ public class ImageProcessingService(IWebHostEnvironment environment)
             throw new InvalidOperationException("Непідтримуваний формат зображення. Дозволені: JPEG, PNG, WebP, GIF, BMP, ICO, AVIF, HEIC.");
         }
 
-        var webRoot = environment.WebRootPath ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
+        var webRoot = environment.WebRootPath ?? Path.Combine
+            (AppContext.BaseDirectory, "wwwroot");
+
         var uploadsRoot = Path.Combine(webRoot, "uploads", "products");
         Directory.CreateDirectory(uploadsRoot);
 

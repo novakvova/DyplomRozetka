@@ -7,14 +7,16 @@ namespace Rozetka.Api.Controllers;
 
 [ApiController]
 [Route("api/catalog")]
-public class CatalogController(AppDbContext db) : ControllerBase
+public class CatalogController(AppDbContext db) 
+    : ControllerBase
 {
     [HttpGet("categories")]
-    public async Task<IReadOnlyList<CategoryDto>> Categories()
+    public async Task<IReadOnlyList<CategoryDto>> Categories
+        (CancellationToken cancellationToken)
     {
         var categories = await db.Categories
             .OrderBy(item => item.Title)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         return categories.Select(item => item.ToDto()).ToList();
     }
@@ -23,9 +25,13 @@ public class CatalogController(AppDbContext db) : ControllerBase
     public async Task<IReadOnlyList<ProductDto>> Products(
         [FromQuery] string? category,
         [FromQuery] string? search,
-        [FromQuery] string? brand)
+        [FromQuery] string? brand,
+        CancellationToken cancellationToken)
     {
-        var query = db.Products.Include(item => item.Category).Include(item => item.Images).AsQueryable();
+        var query = db.Products
+            .Include(item => item.Category)
+            .Include(item => item.Images)
+            .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(category))
         {
@@ -35,6 +41,7 @@ public class CatalogController(AppDbContext db) : ControllerBase
         if (!string.IsNullOrWhiteSpace(search))
         {
             var normalized = search.Trim().ToLower();
+
             query = query.Where(item =>
                 item.Title.ToLower().Contains(normalized) ||
                 item.Brand.ToLower().Contains(normalized) ||
@@ -48,15 +55,20 @@ public class CatalogController(AppDbContext db) : ControllerBase
 
         var products = await query
             .OrderBy(item => item.Title)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         return products.Select(item => item.ToDto()).ToList();
     }
 
     [HttpGet("products/{id:guid}")]
-    public async Task<ActionResult<ProductDto>> Product(Guid id)
+    public async Task<ActionResult<ProductDto>> Product
+        (Guid id, CancellationToken cancellationToken)
     {
-        var product = await db.Products.Include(item => item.Category).Include(item => item.Images).SingleOrDefaultAsync(item => item.Id == id);
+        var product = await db.Products
+            .Include(item => item.Category)
+            .Include(item => item.Images)
+            .SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+
         return product is null ? NotFound() : product.ToDto();
     }
 }

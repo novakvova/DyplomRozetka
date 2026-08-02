@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Rozetka.Api.Common;
 using Rozetka.Api.Data;
 using Rozetka.Api.Dtos;
 using Rozetka.Api.Models;
@@ -11,22 +12,30 @@ namespace Rozetka.Api.Controllers;
 [Authorize(Roles = "Admin")]
 [ApiController]
 [Route("api/admin")]
-public class AdminController(AppDbContext db, ImageProcessingService imageProcessingService) : ControllerBase
+public class AdminController
+    (AppDbContext db, ImageProcessingService imageProcessingService) 
+    : ControllerBase
 {
     [HttpGet("users")]
-    public async Task<IReadOnlyList<UserDto>> Users()
+    public async Task<IReadOnlyList<UserDto>> Users
+        (CancellationToken cancellationToken)
     {
-        var users = await db.Users.OrderBy(item => item.Email).ToListAsync();
+        var users = await db.Users.OrderBy(item => item.Email)
+            .ToListAsync(cancellationToken);
+
         return users.Select(item => item.ToDto()).ToList();
     }
 
     [HttpPost("admins")]
-    public async Task<ActionResult<UserDto>> CreateAdmin(RegisterRequest request)
+    public async Task<ActionResult<UserDto>> CreateAdmin
+        (RegisterRequest request, CancellationToken cancellationToken)
     {
         var email = request.Email.Trim().ToLowerInvariant();
-        if (await db.Users.AnyAsync(item => item.Email == email))
+
+        if (await db.Users.AnyAsync
+            (item => item.Email == email, cancellationToken))
         {
-            return Conflict("Користувач із таким email вже існує.");
+            return Conflict(ErrorMessages.EmailAlreadyExists);
         }
 
         var user = new User
@@ -40,40 +49,50 @@ public class AdminController(AppDbContext db, ImageProcessingService imageProces
         };
 
         db.Users.Add(user);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
         return user.ToDto();
     }
 
+
     [HttpPut("users/{id:guid}/block")]
-    public async Task<ActionResult<UserDto>> ToggleBlock(Guid id)
+    public async Task<ActionResult<UserDto>> ToggleBlock
+        (Guid id, CancellationToken cancellationToken)
     {
-        var user = await db.Users.FindAsync(id);
+        var user = await db.Users.SingleOrDefaultAsync
+            (item => item.Id == id, cancellationToken);
+
         if (user is null)
         {
             return NotFound();
         }
 
         user.IsBlocked = !user.IsBlocked;
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
         return user.ToDto();
     }
 
     [HttpPut("users/{id:guid}/role")]
-    public async Task<ActionResult<UserDto>> ToggleRole(Guid id)
+    public async Task<ActionResult<UserDto>> ToggleRole
+        (Guid id, CancellationToken cancellationToken)
     {
-        var user = await db.Users.FindAsync(id);
+        var user = await db.Users.SingleOrDefaultAsync
+            (item => item.Id == id, cancellationToken);
+
         if (user is null)
         {
             return NotFound();
         }
 
-        user.Role = user.Role == UserRole.Admin ? UserRole.User : UserRole.Admin;
-        await db.SaveChangesAsync();
+        user.Role = user.Role == UserRole.Admin ? UserRole.User 
+            : UserRole.Admin;
+
+        await db.SaveChangesAsync(cancellationToken);
         return user.ToDto();
     }
 
     [HttpPost("categories")]
-    public async Task<ActionResult<CategoryDto>> CreateCategory(CategoryUpsertRequest request)
+    public async Task<ActionResult<CategoryDto>> CreateCategory
+        (CategoryUpsertRequest request, CancellationToken cancellationToken)
     {
         var category = new Category
         {
@@ -83,14 +102,16 @@ public class AdminController(AppDbContext db, ImageProcessingService imageProces
         };
 
         db.Categories.Add(category);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
         return category.ToDto();
     }
 
     [HttpPut("categories/{id:guid}")]
-    public async Task<ActionResult<CategoryDto>> UpdateCategory(Guid id, CategoryUpsertRequest request)
+    public async Task<ActionResult<CategoryDto>> UpdateCategory
+        (Guid id, CategoryUpsertRequest request, CancellationToken cancellationToken)
     {
-        var category = await db.Categories.FindAsync(id);
+        var category = await db.Categories.SingleOrDefaultAsync
+            (item => item.Id == id, cancellationToken);
         if (category is null)
         {
             return NotFound();
@@ -99,14 +120,18 @@ public class AdminController(AppDbContext db, ImageProcessingService imageProces
         category.Slug = request.Slug.Trim().ToLowerInvariant();
         category.Title = request.Title.Trim();
         category.Description = request.Description.Trim();
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
         return category.ToDto();
     }
 
     [HttpDelete("categories/{id:guid}")]
-    public async Task<IActionResult> DeleteCategory(Guid id)
+    public async Task<IActionResult> DeleteCategory
+        (Guid id, CancellationToken cancellationToken)
     {
-        var category = await db.Categories.Include(item => item.Products).SingleOrDefaultAsync(item => item.Id == id);
+        var category = await db.Categories.
+            Include(item => item.Products).
+            SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+
         if (category is null)
         {
             return NotFound();
@@ -114,97 +139,101 @@ public class AdminController(AppDbContext db, ImageProcessingService imageProces
 
         if (category.Products.Any())
         {
-            return BadRequest("Не можна видалити категорію, у якій є товари.");
+            return BadRequest(ErrorMessages.CategoryHasProducts);
         }
 
         db.Categories.Remove(category);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
 
     [HttpPost("products")]
-    public async Task<ActionResult<ProductDto>> CreateProduct(ProductUpsertRequest request)
+    public async Task<ActionResult<ProductDto>> CreateProduct
+        (ProductUpsertRequest request, CancellationToken cancellationToken)
     {
-        var category = await db.Categories.FindAsync(request.CategoryId);
+        var category = await db.Categories.SingleOrDefaultAsync
+            (item => item.Id == request.CategoryId, cancellationToken);
+
         if (category is null)
         {
-            return BadRequest("Категорію не знайдено.");
+            return BadRequest(ErrorMessages.CategoryNotFound);
         }
 
         var product = new Product();
         Apply(product, request);
         db.Products.Add(product);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
 
         product.Category = category;
         return product.ToDto();
     }
 
     [HttpPut("products/{id:guid}")]
-    public async Task<ActionResult<ProductDto>> UpdateProduct(Guid id, ProductUpsertRequest request)
+    public async Task<ActionResult<ProductDto>> UpdateProduct
+        (Guid id, ProductUpsertRequest request, CancellationToken cancellationToken)
     {
-        var product = await db.Products.Include(item => item.Category).Include(item => item.Images).SingleOrDefaultAsync(item => item.Id == id);
+        var product = await db.Products
+            .Include(item => item.Category)
+            .Include(item => item.Images)
+            .SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
         if (product is null)
         {
             return NotFound();
         }
 
         Apply(product, request);
-        await db.SaveChangesAsync();
-        await db.Entry(product).Reference(item => item.Category).LoadAsync();
+        await db.SaveChangesAsync(cancellationToken);
+        await db.Entry(product)
+            .Reference(item => item.Category)
+            .LoadAsync(cancellationToken);
+
         return product.ToDto();
     }
 
     [HttpDelete("products/{id:guid}")]
-    public async Task<IActionResult> DeleteProduct(Guid id)
+    public async Task<IActionResult> DeleteProduct
+        (Guid id, CancellationToken cancellationToken)
     {
-        var product = await db.Products.FindAsync(id);
+        var product = await db.Products.SingleOrDefaultAsync
+            (item => item.Id == id, cancellationToken);
         if (product is null)
         {
             return NotFound();
         }
 
         db.Products.Remove(product);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
 
-    public class ModelUploadImage
-    {
-        public Guid Id { get; set; }
-        [FromForm]
-        public IFormFileCollection Files { get; set; }
-    }
 
     [HttpPost("products/images")]
-    [RequestSizeLimit(10_485_760)]
+    [RequestSizeLimit(ValidationConstants.MaxProductImageBytes)]
     [Consumes("multipart/form-data")]
-    public async Task<ActionResult<IReadOnlyList<ProductImageDto>>> UploadImages([FromForm] ModelUploadImage model)
+    public async Task<ActionResult<IReadOnlyList<ProductImageDto>>> 
+        UploadImages
+        ([FromForm] ModelUploadImage model, CancellationToken cancellationToken)
     {
-        var product = await db.Products.Include(item => item.Images).SingleOrDefaultAsync(item => item.Id == model.Id);
+        var product = await db.Products
+            .Include(item => item.Images)
+            .SingleOrDefaultAsync(item => item.Id == model.Id, cancellationToken);
         if (product is null)
         {
             return NotFound();
         }
 
-        if (model.Files.Count == 0)
+        if (model.File.Count == 0)
         {
             return BadRequest("Не передано жодного файлу.");
         }
 
-        var nextSortOrder = product.Images.Count == 0 ? 0 : product.Images.Max(image => image.SortOrder) + 1;
+        var nextSortOrder = product.Images.Count == 0 ? 0 
+            : product.Images.Max(image => image.SortOrder) + 1;
 
-        foreach (var file in model.Files)
+        foreach (var file in model.File)
         {
-            ProcessedImage processed;
-            try
-            {
-                processed = await imageProcessingService.ProcessAsync(file);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            var processed = await imageProcessingService
+                .ProcessAsync(file, cancellationToken);
 
             var image = new ProductImage
             {
@@ -216,29 +245,38 @@ public class AdminController(AppDbContext db, ImageProcessingService imageProces
             };
 
             db.ProductImages.Add(image);
-            product.Images.Add(image);
+           
         }
 
         if (string.IsNullOrWhiteSpace(product.ImageUrl))
         {
-            product.ImageUrl = product.Images.OrderBy(image => image.SortOrder).First().LargeUrl;
+            product.ImageUrl = product.Images
+                .OrderBy(image => image.SortOrder)
+                .First().LargeUrl;
         }
 
-        await db.SaveChangesAsync();
-        return product.Images.OrderBy(image => image.SortOrder).Select(image => image.ToDto()).ToList();
+        await db.SaveChangesAsync(cancellationToken);
+        return product.Images
+            .OrderBy(image => image.SortOrder)
+            .Select(image => image
+            .ToDto())
+            .ToList();
     }
 
     [HttpDelete("products/{productId:guid}/images/{imageId:guid}")]
-    public async Task<IActionResult> DeleteImage(Guid productId, Guid imageId)
+    public async Task<IActionResult> DeleteImage
+        (Guid productId, Guid imageId, CancellationToken cancellationToken)
     {
-        var image = await db.ProductImages.SingleOrDefaultAsync(item => item.Id == imageId && item.ProductId == productId);
+        var image = await db.ProductImages.SingleOrDefaultAsync
+            (item => item.Id == imageId && item.ProductId == productId, cancellationToken);
+
         if (image is null)
         {
             return NotFound();
         }
 
         db.ProductImages.Remove(image);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
 
         imageProcessingService.DeleteByUrl(image.ThumbnailUrl);
         imageProcessingService.DeleteByUrl(image.MediumUrl);
@@ -247,7 +285,8 @@ public class AdminController(AppDbContext db, ImageProcessingService imageProces
         return NoContent();
     }
 
-    private static void Apply(Product product, ProductUpsertRequest request)
+    private static void Apply
+        (Product product, ProductUpsertRequest request)
     {
         product.Sku = request.Sku.Trim();
         product.Title = request.Title.Trim();
@@ -262,7 +301,7 @@ public class AdminController(AppDbContext db, ImageProcessingService imageProces
         product.Specifications = request.Specifications.Trim();
         product.StockQuantity = request.StockQuantity;
         product.CategoryId = request.CategoryId;
-        product.Rating = product.Rating == 0 ? 4.7 : product.Rating;
-        product.ReviewsCount = product.ReviewsCount == 0 ? 1 : product.ReviewsCount;
+        product.Rating = product.Rating == 0 ? ValidationConstants.DefaultProductRating : product.Rating;
+        product.ReviewsCount = product.ReviewsCount == 0 ? ValidationConstants.DefaultProductReviewsCount : product.ReviewsCount;
     }
 }
