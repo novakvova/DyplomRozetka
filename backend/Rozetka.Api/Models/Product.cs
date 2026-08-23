@@ -19,6 +19,7 @@ public class Product
     public int StockQuantity { get; set; }
     public Guid CategoryId { get; set; }
     public Category? Category { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public ICollection<Review> Reviews { get; set; } = new List<Review>();
     public ICollection<ProductImage> Images { get; set; } = new List<ProductImage>();
 }

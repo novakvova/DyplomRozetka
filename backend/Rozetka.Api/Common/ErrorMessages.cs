@@ -9,8 +9,4 @@ public static class ErrorMessages
     public const string ProductNotFound = "Товар не знайдено.";
     public const string CategoryNotFound = "Категорію не знайдено.";
     public const string CategoryHasProducts = "Не можна видалити категорію, у якій є товари.";
-    public static readonly string PasswordTooShort =
-        $"Пароль має містити щонайменше {ValidationConstants.MinPasswordLength} символів.";
-    public static readonly string NewPasswordTooShort =
-        $"Новий пароль має містити щонайменше {ValidationConstants.MinPasswordLength} символів.";
 }

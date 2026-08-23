@@ -1,11 +1,13 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Rozetka.Api.Models;
 
 namespace Rozetka.Api.Data;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public class AppDbContext(DbContextOptions<AppDbContext> options)
+    : IdentityDbContext<User, IdentityRole<Guid>, Guid>(options)
 {
-    public DbSet<User> Users => Set<User>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<CartItem> CartItems => Set<CartItem>();
@@ -17,12 +19,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
+
         modelBuilder.Entity<User>(entity =>
         {
-            entity.HasIndex(item => item.Email).IsUnique();
-            entity.Property(item => item.Email).HasMaxLength(180);
             entity.Property(item => item.FullName).HasMaxLength(160);
-            entity.Property(item => item.Phone).HasMaxLength(40);
             entity.Property(item => item.City).HasMaxLength(120);
         });
 
