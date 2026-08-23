@@ -1,12 +1,15 @@
 using System.Text;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Rozetka.Api.Common;
 using Rozetka.Api.Data;
 using Rozetka.Api.Middleware;
+using Rozetka.Api.Models;
 using Rozetka.Api.Options;
 using Rozetka.Api.Services;
 
@@ -16,9 +19,13 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
+
 builder.Services.AddEndpointsApiExplorer();
+
 builder.Services.AddProblemDetails();
+
 builder.Services.AddExceptionHandler<ImageProcessingExceptionHandler>();
+
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer((document, context, cancellationToken) =>
@@ -36,7 +43,8 @@ builder.Services.AddOpenApi(options =>
             Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\""
         };
 
-        document.Security = [
+        document.Security =
+        [
             new OpenApiSecurityRequirement
             {
                 {
@@ -48,50 +56,49 @@ builder.Services.AddOpenApi(options =>
 
         document.SetReferenceHostDocument();
 
-
-        document.Servers = [
-                new OpenApiServer
-            {
-                Url = builder.Configuration["ServerRunUrl"]
-            }
-            ];
+        document.Servers = [new OpenApiServer { Url = builder.Configuration["ServerRunUrl"] }];
 
         return Task.CompletedTask;
     });
 });
+
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddSingleton<ImageProcessingService>();
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services
+    .AddIdentityCore<User>(options =>
+    {
+        options.Password.RequiredLength = ValidationConstants.MinPasswordLength;
+        options.Password.RequireDigit = false;
+        options.Password.RequireLowercase = false;
+        options.Password.RequireUppercase = false;
+        options.Password.RequireNonAlphanumeric = false;
+        options.User.RequireUniqueEmail = true;
+    })
+    .AddRoles<IdentityRole<Guid>>()
+    .AddEntityFrameworkStores<AppDbContext>()
+    .AddDefaultTokenProviders();
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
 
-var corsOptions = builder.Configuration
-    .GetSection(FrontendCorsOptions.SectionName)
-    .Get<FrontendCorsOptions>()
-
+var corsOptions = builder.Configuration.GetSection(FrontendCorsOptions.SectionName).Get<FrontendCorsOptions>()
     ?? new FrontendCorsOptions();
-
 
 builder.Services.AddCors(options =>
 {
-options.AddPolicy(FrontendCorsOptions.PolicyName, policy =>
-    {
+    options.AddPolicy(FrontendCorsOptions.PolicyName, policy =>
         policy.WithOrigins(corsOptions.AllowedOrigins)
             .AllowAnyHeader()
-            .AllowAnyMethod();
-    });
+            .AllowAnyMethod());
 });
 
-var jwtOptions = builder.Configuration
-    .GetSection(JwtOptions.SectionName)
-    .Get<JwtOptions>()
-
-    ?? throw new InvalidOperationException("Розділ конфігурації JwtOptions не знайдено");
-
+var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
+    ?? throw new InvalidOperationException("Розділ конфігурації 'Jwt' не знайдено.");
 var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key));
-
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -135,6 +142,7 @@ app.UseStaticFiles(new StaticFileOptions
 app.UseCors(FrontendCorsOptions.PolicyName);
 
 app.UseAuthentication();
+app.UseMiddleware<BlockedUserMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();
@@ -142,7 +150,9 @@ app.MapControllers();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await SeedData.InitializeAsync(db);
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
+    await SeedData.InitializeAsync(db, userManager, roleManager);
 }
 
 app.Run();

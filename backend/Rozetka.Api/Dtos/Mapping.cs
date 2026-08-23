@@ -1,3 +1,4 @@
+using Rozetka.Api.Common;
 using Rozetka.Api.Models;
 using Rozetka.Api.Data;
 
@@ -5,8 +6,15 @@ namespace Rozetka.Api.Dtos;
 
 public static class Mapping
 {
-    public static UserDto ToDto(this User user) =>
-        new(user.Id, user.Email, user.FullName, user.Phone, user.City, user.Role, user.IsBlocked);
+    public static UserDto ToDto(this User user, IEnumerable<string> roles) =>
+        new(
+            user.Id,
+            user.Email ?? string.Empty,
+            user.FullName,
+            user.PhoneNumber ?? string.Empty,
+            user.City,
+            roles.Contains(Roles.Admin) ? Roles.Admin : Roles.User,
+            user.IsBlocked);
 
     public static CategoryDto ToDto(this Category category) =>
         new(category.Id, category.Slug, category.Title, category.Description);

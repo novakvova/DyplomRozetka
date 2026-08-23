@@ -1,9 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Rozetka.Api.Common;
-using Rozetka.Api.Data;
 using Rozetka.Api.Dtos;
 using Rozetka.Api.Models;
 using Rozetka.Api.Options;
@@ -13,57 +12,48 @@ namespace Rozetka.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public class AuthController
-    (AppDbContext db, JwtTokenService jwtTokenService,
-    IOptions<AuthOptions> authOptions)
-    : ControllerBase
+public class AuthController(UserManager<User> userManager, JwtTokenService jwtTokenService, IOptions<AuthOptions> authOptions) : ControllerBase
 {
     [HttpPost("register")]
-    public async Task<ActionResult<AuthResponse>> Register
-        (RegisterRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<AuthResponse>> Register(RegisterRequest request)
     {
         var email = request.Email.Trim().ToLowerInvariant();
-
-        if (request.Password.Length < ValidationConstants.MinPasswordLength)
-        {
-            return BadRequest(ErrorMessages.PasswordTooShort);
-        }
-
-        if (await db.Users.AnyAsync
-            (item => item.Email == email, cancellationToken))
-        {
-            return Conflict(ErrorMessages.EmailAlreadyExists);
-        }
-
-        var isSeedAdmin = string.Equals
-            (email, authOptions.Value.SeedAdminEmail,
-            StringComparison.OrdinalIgnoreCase);
 
         var user = new User
         {
+            UserName = email,
             Email = email,
             FullName = request.FullName.Trim(),
-            Phone = request.Phone.Trim(),
-            City = request.City.Trim(),
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-            Role = isSeedAdmin ? UserRole.Admin : UserRole.User
+            PhoneNumber = request.Phone.Trim(),
+            City = request.City.Trim()
         };
 
-        db.Users.Add(user);
-        await db.SaveChangesAsync(cancellationToken);
+        var createResult = await userManager.CreateAsync(user, request.Password);
+        if (!createResult.Succeeded)
+        {
+            if (createResult.Errors.Any(error => error.Code is "DuplicateUserName" or "DuplicateEmail"))
+            {
+                return Conflict(ErrorMessages.EmailAlreadyExists);
+            }
 
-        return new AuthResponse(jwtTokenService.CreateToken(user), user.ToDto());
+            return BadRequest(DescribeErrors(createResult));
+        }
+
+        var isSeedAdmin = string.Equals(email, authOptions.Value.SeedAdminEmail, StringComparison.OrdinalIgnoreCase);
+        await userManager.AddToRoleAsync(user, isSeedAdmin ? Roles.Admin : Roles.User);
+
+        var roles = await userManager.GetRolesAsync(user);
+
+        return new AuthResponse(jwtTokenService.CreateToken(user, roles), user.ToDto(roles));
     }
 
     [HttpPost("login")]
-    public async Task<ActionResult<AuthResponse>> Login
-        (LoginRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<AuthResponse>> Login(LoginRequest request)
     {
         var email = request.Email.Trim().ToLowerInvariant();
-        var user = await db.Users.SingleOrDefaultAsync
-            (item => item.Email == email, cancellationToken);
+        var user = await userManager.FindByEmailAsync(email);
 
-        if (user is null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+        if (user is null || !await userManager.CheckPasswordAsync(user, request.Password))
         {
             return Unauthorized(ErrorMessages.InvalidCredentials);
         }
@@ -73,12 +63,12 @@ public class AuthController
             return Forbid(ErrorMessages.UserBlocked);
         }
 
-        return new AuthResponse(jwtTokenService.CreateToken(user), user.ToDto());
+        var roles = await userManager.GetRolesAsync(user);
+        return new AuthResponse(jwtTokenService.CreateToken(user, roles), user.ToDto(roles));
     }
 
     [HttpPost("google")]
-    public async Task<ActionResult<AuthResponse>> Google
-        (GoogleLoginRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<AuthResponse>> Google(GoogleLoginRequest request)
     {
         var email = request.Email.Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(request.GoogleToken))
@@ -86,22 +76,25 @@ public class AuthController
             return BadRequest("Не вдалося підтвердити Google-вхід.");
         }
 
-        var user = await db.Users.SingleOrDefaultAsync
-            (item => item.Email == email, cancellationToken);
-
+        var user = await userManager.FindByEmailAsync(email);
         if (user is null)
         {
             user = new User
             {
+                UserName = email,
                 Email = email,
                 FullName = string.IsNullOrWhiteSpace(request.FullName) ? "Google користувач" : request.FullName.Trim(),
-                Phone = "",
-                City = "",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString("N")),
-                Role = UserRole.User
+                PhoneNumber = "",
+                City = ""
             };
-            db.Users.Add(user);
-            await db.SaveChangesAsync(cancellationToken);
+
+            var createResult = await userManager.CreateAsync(user, Guid.NewGuid().ToString("N"));
+            if (!createResult.Succeeded)
+            {
+                return BadRequest(DescribeErrors(createResult));
+            }
+
+            await userManager.AddToRoleAsync(user, Roles.User);
         }
 
         if (user.IsBlocked)
@@ -109,94 +102,96 @@ public class AuthController
             return Forbid(ErrorMessages.UserBlocked);
         }
 
-        return new AuthResponse(jwtTokenService.CreateToken(user), user.ToDto());
+        var roles = await userManager.GetRolesAsync(user);
+        return new AuthResponse(jwtTokenService.CreateToken(user, roles), user.ToDto(roles));
     }
 
     [HttpPost("recover")]
-    public async Task<IActionResult> Recover
-        (PasswordRecoveryRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Recover(PasswordRecoveryRequest request)
     {
         var email = request.Email.Trim().ToLowerInvariant();
-        var user = await db.Users.SingleOrDefaultAsync
-            (item => item.Email == email, cancellationToken);
-
+        var user = await userManager.FindByEmailAsync(email);
         if (user is null)
         {
             return NotFound("Користувача з таким email не знайдено.");
         }
 
-        if (request.NewPassword.Length < ValidationConstants.MinPasswordLength)
+        var removeResult = await userManager.RemovePasswordAsync(user);
+        if (!removeResult.Succeeded)
         {
-            return BadRequest(ErrorMessages.NewPasswordTooShort);
+            return BadRequest(DescribeErrors(removeResult));
         }
 
-        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword
-            (request.NewPassword);
+        var addResult = await userManager.AddPasswordAsync(user, request.NewPassword);
+        if (!addResult.Succeeded)
+        {
+            return BadRequest(DescribeErrors(addResult));
+        }
 
-        await db.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
 
     [Authorize]
     [HttpPut("password")]
-    public async Task<IActionResult> ChangePassword
-        (ChangePasswordRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> ChangePassword(ChangePasswordRequest request)
     {
         var userId = CurrentUser.GetUserId(User);
-        var user = await db.Users.SingleOrDefaultAsync
-            (item => item.Id == userId, cancellationToken);
-
+        var user = await userManager.FindByIdAsync(userId.ToString());
         if (user is null)
         {
             return Unauthorized();
         }
 
-        if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+        var result = await userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+        if (!result.Succeeded)
         {
-            return BadRequest("Поточний пароль неправильний.");
+            if (result.Errors.Any(error => error.Code == "PasswordMismatch"))
+            {
+                return BadRequest("Поточний пароль неправильний.");
+            }
+
+            return BadRequest(DescribeErrors(result));
         }
 
-        if (request.NewPassword.Length < ValidationConstants.MinPasswordLength)
-        {
-            return BadRequest(ErrorMessages.NewPasswordTooShort);
-        }
-
-        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
-        await db.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
 
     [Authorize]
     [HttpPut("profile")]
-    public async Task<ActionResult<UserDto>> UpdateProfile
-        (ProfileUpdateRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<UserDto>> UpdateProfile(ProfileUpdateRequest request)
     {
         var userId = CurrentUser.GetUserId(User);
-        var user = await db.Users.SingleOrDefaultAsync
-            (item => item.Id == userId, cancellationToken);
-
+        var user = await userManager.FindByIdAsync(userId.ToString());
         if (user is null)
         {
             return Unauthorized();
         }
 
         user.FullName = request.FullName.Trim();
-        user.Phone = request.Phone.Trim();
+        user.PhoneNumber = request.Phone.Trim();
         user.City = request.City.Trim();
 
-        await db.SaveChangesAsync(cancellationToken);
-        return user.ToDto();
+        await userManager.UpdateAsync(user);
+
+        var roles = await userManager.GetRolesAsync(user);
+        return user.ToDto(roles);
     }
 
     [Authorize]
     [HttpGet("me")]
-    public async Task<ActionResult<UserDto>> Me
-        (CancellationToken cancellationToken)
+    public async Task<ActionResult<UserDto>> Me()
     {
         var userId = CurrentUser.GetUserId(User);
-        var user = await db.Users.SingleOrDefaultAsync
-            (item => item.Id == userId, cancellationToken);
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return Unauthorized();
+        }
 
-        return user is null ? Unauthorized() : user.ToDto();
+        var roles = await userManager.GetRolesAsync(user);
+        return user.ToDto(roles);
     }
+
+    private static string DescribeErrors(IdentityResult result) =>
+        string.Join(" ", result.Errors.Select(error => error.Description));
 }
