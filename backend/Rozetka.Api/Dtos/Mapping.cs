@@ -17,7 +17,7 @@ public static class Mapping
             user.IsBlocked);
 
     public static CategoryDto ToDto(this Category category) =>
-        new(category.Id, category.Slug, category.Title, category.Description);
+        new(category.Id, category.Slug, category.Title, category.Description, category.ImageUrl);
 
     public static ProductImageDto ToDto(this ProductImage image) =>
         new(image.Id, image.ThumbnailUrl, image.MediumUrl, image.LargeUrl, image.SortOrder);

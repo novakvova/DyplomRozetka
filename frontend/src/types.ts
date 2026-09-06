@@ -1,5 +1,13 @@
 export type UserRole = 'User' | 'Admin';
 
+export type PagedResult<T> = {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+};
+
 export type User = {
   id: string;
   email: string;
@@ -20,6 +28,7 @@ export type Category = {
   slug: string;
   title: string;
   description: string;
+  imageUrl: string;
 };
 
 export type Product = {

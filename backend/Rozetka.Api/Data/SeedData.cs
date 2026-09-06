@@ -13,37 +13,49 @@ public static class SeedData
         await EnsureIdentityTablesAsync(db);
         await EnsureProductImagesTableAsync(db);
         await EnsureProductCreatedAtColumnAsync(db);
+        await EnsureCategoryImageUrlColumnAsync(db);
 
         await EnsureRoleAsync(roleManager, Roles.Admin);
         await EnsureRoleAsync(roleManager, Roles.User);
 
         if (!db.Users.Any())
         {
-            await CreateSeedUserAsync(userManager, "radon.bogdan09@gmail.com", "Admin12345", "Адміністратор Rozetka", "+380991112233", "Київ", Roles.Admin);
+            await CreateSeedUserAsync(userManager, "admin2026@gmail.com", "Admin2026", "Адміністратор Lumio", "+380991112233", "Київ", Roles.Admin);
             await CreateSeedUserAsync(userManager, "user@example.com", "User12345", "Тестовий користувач", "+380671112233", "Львів", Roles.User);
         }
 
-        if (await db.Categories.AnyAsync())
+        if (await db.Products.AnyAsync())
         {
             await UpdateSeedProductAssets(db);
             await db.SaveChangesAsync();
             return;
         }
 
-        var categories = new[]
+        var existingCategories = await db.Categories.ToListAsync();
+
+        var defaultCategories = new[]
         {
-            new Category { Slug = "smartphones", Title = "Смартфони", Description = "Apple, Samsung та інші хіти сезону." },
-            new Category { Slug = "laptops", Title = "Ноутбуки", Description = "Для навчання, роботи й мобільного офісу." },
-            new Category { Slug = "audio", Title = "Аудіо", Description = "Навушники, колонки й персональний звук." },
-            new Category { Slug = "gaming", Title = "Геймінг", Description = "Консолі, аксесуари та все для гри." },
-            new Category { Slug = "home", Title = "Дім", Description = "Техніка для комфорту та затишку." },
-            new Category { Slug = "accessories", Title = "Аксесуари", Description = "Кабелі, зарядки та корисні дрібниці." }
+            ("smartphones", "Смартфони", "Apple, Samsung та інші хіти сезону."),
+            ("laptops", "Ноутбуки", "Для навчання, роботи й мобільного офісу."),
+            ("audio", "Аудіо", "Навушники, колонки й персональний звук."),
+            ("gaming", "Геймінг", "Консолі, аксесуари та все для гри."),
+            ("home", "Дім", "Техніка для комфорту та затишку."),
+            ("accessories", "Аксесуари", "Кабелі, зарядки та корисні дрібниці.")
         };
 
-        db.Categories.AddRange(categories);
+        foreach (var (slug, title, description) in defaultCategories)
+        {
+            if (!existingCategories.Any(item => item.Slug == slug))
+            {
+                var category = new Category { Slug = slug, Title = title, Description = description };
+                db.Categories.Add(category);
+                existingCategories.Add(category);
+            }
+        }
+
         await db.SaveChangesAsync();
 
-        Category C(string slug) => categories.Single(item => item.Slug == slug);
+        Category C(string slug) => existingCategories.Single(item => item.Slug == slug);
 
         db.Products.AddRange(
             Product("iphone-15-128-black", "Apple iPhone 15 128GB Black", "Смартфон із Dynamic Island і камерою 48 Мп", C("smartphones"), "Apple", 38999, 40999, "Топ продажів", 4.9, 314, 18, daysAgo: 1),
@@ -140,7 +152,10 @@ public static class SeedData
         var products = await db.Products.ToListAsync();
         foreach (var product in products)
         {
-            product.ImageUrl = ProductAssets.PrimaryImageUrl(product.Sku, product.Title);
+            if (string.IsNullOrWhiteSpace(product.ImageUrl))
+            {
+                product.ImageUrl = ProductAssets.PrimaryImageUrl(product.Sku, product.Title);
+            }
         }
     }
 
@@ -248,6 +263,14 @@ public static class SeedData
         await db.Database.ExecuteSqlRawAsync("""
             ALTER TABLE "Products"
             ADD COLUMN IF NOT EXISTS "CreatedAt" timestamp with time zone NOT NULL DEFAULT NOW();
+            """);
+    }
+
+    private static async Task EnsureCategoryImageUrlColumnAsync(AppDbContext db)
+    {
+        await db.Database.ExecuteSqlRawAsync("""
+            ALTER TABLE "Categories"
+            ADD COLUMN IF NOT EXISTS "ImageUrl" varchar(500) NOT NULL DEFAULT '';
             """);
     }
 }

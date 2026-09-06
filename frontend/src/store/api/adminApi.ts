@@ -21,7 +21,19 @@ type CategoryRequest = {
     slug: string;
     title: string;
     description: string;
+    image?: File | null;
 };
+
+function toCategoryFormData(body: CategoryRequest): FormData {
+    const form = new FormData();
+    form.append('slug', body.slug);
+    form.append('title', body.title);
+    form.append('description', body.description);
+    if (body.image) {
+        form.append('image', body.image);
+    }
+    return form;
+}
 
 type AdminRequest = {
     email: string;
@@ -46,7 +58,11 @@ export const adminApi = apiSlice.injectEndpoints({
             invalidatesTags: ['Products'],
         }),
         createCategory: builder.mutation<Category, CategoryRequest>({
-            query: (body) => ({ url: '/admin/categories', method: 'POST', body }),
+            query: (body) => ({ url: '/admin/categories', method: 'POST', body: toCategoryFormData(body) }),
+            invalidatesTags: ['Categories'],
+        }),
+        updateCategory: builder.mutation<Category, CategoryRequest & { id: string }>({
+            query: ({ id, ...body }) => ({ url: `/admin/categories/${id}`, method: 'PUT', body: toCategoryFormData(body) }),
             invalidatesTags: ['Categories'],
         }),
         createAdmin: builder.mutation<User, AdminRequest>({
@@ -69,6 +85,7 @@ export const {
     useCreateProductMutation,
     useDeleteProductMutation,
     useCreateCategoryMutation,
+    useUpdateCategoryMutation,
     useCreateAdminMutation,
     useToggleUserBlockMutation,
     useToggleUserRoleMutation,

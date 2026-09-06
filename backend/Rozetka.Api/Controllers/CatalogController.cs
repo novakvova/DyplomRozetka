@@ -7,7 +7,7 @@ namespace Rozetka.Api.Controllers;
 
 [ApiController]
 [Route("api/catalog")]
-public class CatalogController(AppDbContext db) 
+public class CatalogController(AppDbContext db)
     : ControllerBase
 {
     [HttpGet("categories")]
@@ -22,11 +22,14 @@ public class CatalogController(AppDbContext db)
     }
 
     [HttpGet("products")]
-    public async Task<IReadOnlyList<ProductDto>> Products(
+    public async Task<PagedResultDto<ProductDto>> Products(
         [FromQuery] string? category,
         [FromQuery] string? search,
         [FromQuery] string? brand,
-        CancellationToken cancellationToken)
+        [FromQuery] string? sort,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 24,
+        CancellationToken cancellationToken = default)
     {
         var query = db.Products
             .Include(item => item.Category)
@@ -53,11 +56,31 @@ public class CatalogController(AppDbContext db)
             query = query.Where(item => item.Brand == brand);
         }
 
+        query = sort switch
+        {
+            "price_asc" => query.OrderBy(item => item.Price),
+            "price_desc" => query.OrderByDescending(item => item.Price),
+            "rating" => query.OrderByDescending(item => item.Rating).ThenByDescending(item => item.ReviewsCount),
+            "newest" => query.OrderByDescending(item => item.CreatedAt),
+            _ => query.OrderBy(item => item.Title),
+        };
+
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize is < 1 or > 100 ? 24 : pageSize;
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
         var products = await query
-            .OrderBy(item => item.Title)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        return products.Select(item => item.ToDto()).ToList();
+        return new PagedResultDto<ProductDto>(
+            products.Select(item => item.ToDto()).ToList(),
+            page,
+            pageSize,
+            totalCount,
+            pageSize == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize));
     }
 
     [HttpGet("products/{id:guid}")]
