@@ -10,3 +10,9 @@ public class ModelUploadImage
     [FromForm]
     public IFormFileCollection File { get; set; } = new FormFileCollection();
 }
+
+public class ModelUploadSingleImage
+{
+    [FromForm]
+    public IFormFile File { get; set; } = null!;
+}

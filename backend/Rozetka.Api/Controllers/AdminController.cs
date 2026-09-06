@@ -103,14 +103,22 @@ public class AdminController(AppDbContext db, UserManager<User> userManager, Ima
     }
 
     [HttpPost("categories")]
-    public async Task<ActionResult<CategoryDto>> CreateCategory(CategoryUpsertRequest request, CancellationToken cancellationToken)
+    [RequestSizeLimit(ValidationConstants.MaxProductImageBytes)]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<CategoryDto>> CreateCategory([FromForm] CategoryUpsertForm request, CancellationToken cancellationToken)
     {
         var category = new Category
         {
             Slug = request.Slug.Trim().ToLowerInvariant(),
             Title = request.Title.Trim(),
-            Description = request.Description.Trim()
+            Description = (request.Description ?? string.Empty).Trim()
         };
+
+        if (request.Image is { Length: > 0 })
+        {
+            var processed = await imageProcessingService.ProcessAsync(request.Image, cancellationToken, "categories");
+            category.ImageUrl = processed.MediumUrl;
+        }
 
         db.Categories.Add(category);
         await db.SaveChangesAsync(cancellationToken);
@@ -118,7 +126,9 @@ public class AdminController(AppDbContext db, UserManager<User> userManager, Ima
     }
 
     [HttpPut("categories/{id:guid}")]
-    public async Task<ActionResult<CategoryDto>> UpdateCategory(Guid id, CategoryUpsertRequest request, CancellationToken cancellationToken)
+    [RequestSizeLimit(ValidationConstants.MaxProductImageBytes)]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<CategoryDto>> UpdateCategory(Guid id, [FromForm] CategoryUpsertForm request, CancellationToken cancellationToken)
     {
         var category = await db.Categories.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
         if (category is null)
@@ -128,7 +138,19 @@ public class AdminController(AppDbContext db, UserManager<User> userManager, Ima
 
         category.Slug = request.Slug.Trim().ToLowerInvariant();
         category.Title = request.Title.Trim();
-        category.Description = request.Description.Trim();
+        category.Description = (request.Description ?? string.Empty).Trim();
+
+        if (request.Image is { Length: > 0 })
+        {
+            if (!string.IsNullOrWhiteSpace(category.ImageUrl))
+            {
+                imageProcessingService.DeleteByUrl(category.ImageUrl);
+            }
+
+            var processed = await imageProcessingService.ProcessAsync(request.Image, cancellationToken, "categories");
+            category.ImageUrl = processed.MediumUrl;
+        }
+
         await db.SaveChangesAsync(cancellationToken);
         return category.ToDto();
     }
@@ -148,6 +170,11 @@ public class AdminController(AppDbContext db, UserManager<User> userManager, Ima
         if (category.Products.Any())
         {
             return BadRequest(ErrorMessages.CategoryHasProducts);
+        }
+
+        if (!string.IsNullOrWhiteSpace(category.ImageUrl))
+        {
+            imageProcessingService.DeleteByUrl(category.ImageUrl);
         }
 
         db.Categories.Remove(category);

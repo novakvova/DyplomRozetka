@@ -1,5 +1,5 @@
-import { FormEvent } from 'react';
-import { extractErrorMessage } from '../api/client';
+import { FormEvent, useRef, useState } from 'react';
+import { extractErrorMessage, resolveAssetUrl} from "../store/api/client";
 import {
   useCreateAdminMutation,
   useCreateCategoryMutation,
@@ -8,6 +8,7 @@ import {
   useGetUsersQuery,
   useToggleUserBlockMutation,
   useToggleUserRoleMutation,
+  useUpdateCategoryMutation,
 } from '../store/api/adminApi';
 import { useGetCategoriesQuery, useGetProductsQuery } from '../store/api/catalogApi';
 import { useAppDispatch } from '../store/hooks';
@@ -16,14 +17,18 @@ import { messageSet } from '../store/uiSlice';
 export function AdminPage() {
   const dispatch = useAppDispatch();
   const { data: categories = [] } = useGetCategoriesQuery();
-  const { data: products = [] } = useGetProductsQuery({});
+  const { data: productsPage } = useGetProductsQuery({ pageSize: 100 });
+  const products = productsPage?.items ?? [];
   const { data: users = [] } = useGetUsersQuery();
   const [createProduct] = useCreateProductMutation();
   const [deleteProduct] = useDeleteProductMutation();
   const [createCategory] = useCreateCategoryMutation();
+  const [updateCategory] = useUpdateCategoryMutation();
   const [createAdmin] = useCreateAdminMutation();
   const [toggleUserBlock] = useToggleUserBlockMutation();
   const [toggleUserRole] = useToggleUserRoleMutation();
+  const [categoryImagePreview, setCategoryImagePreview] = useState<string | null>(null);
+  const categoryImageInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   async function handleCreateProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -54,17 +59,40 @@ export function AdminPage() {
 
   async function handleCreateCategory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const data = Object.fromEntries(new FormData(event.currentTarget).entries()) as {
-      slug: string;
-      title: string;
-      description: string;
-    };
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const imageFile = data.get('image') as File | null;
 
     try {
-      await createCategory(data).unwrap();
-      event.currentTarget.reset();
+      await createCategory({
+        slug: data.get('slug') as string,
+        title: data.get('title') as string,
+        description: (data.get('description') as string) ?? '',
+        image: imageFile && imageFile.size > 0 ? imageFile : null,
+      }).unwrap();
+      form.reset();
+      setCategoryImagePreview(null);
+      dispatch(messageSet('Категорію додано.'));
     } catch (error) {
       dispatch(messageSet(extractErrorMessage(error, 'Не вдалося додати категорію.')));
+    }
+  }
+
+  function handleCategoryImagePreview(event: FormEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    if (!file) {
+      setCategoryImagePreview(null);
+      return;
+    }
+    setCategoryImagePreview(URL.createObjectURL(file));
+  }
+
+  async function handleReplaceCategoryImage(categoryId: string, slug: string, title: string, description: string, file: File) {
+    try {
+      await updateCategory({ id: categoryId, slug, title, description, image: file }).unwrap();
+      dispatch(messageSet('Фото категорії оновлено.'));
+    } catch (error) {
+      dispatch(messageSet(extractErrorMessage(error, 'Не вдалося оновити фото категорії.')));
     }
   }
 
@@ -125,8 +153,48 @@ export function AdminPage() {
           <input name="slug" placeholder="slug" required />
           <input name="title" placeholder="Назва категорії" required />
           <textarea name="description" placeholder="Опис" />
-          <button>Додати категорію</button>
-          {categories.map((item) => <small key={item.id}>{item.title} · {item.slug}</small>)}
+          <label className="file-field">
+            <span>Фото категорії</span>
+            <input name="image" type="file" accept="image/*" onChange={handleCategoryImagePreview} />
+          </label>
+          {categoryImagePreview && (
+              <img className="category-photo-preview" src={categoryImagePreview} alt="Попередній перегляд" />
+          )}
+          <button className="primary">Додати категорію</button>
+
+          <div className="category-admin-list">
+            {categories.map((item) => (
+                <div className="category-admin-row" key={item.id}>
+                  {item.imageUrl ? (
+                      <img className="category-admin-thumb" src={resolveAssetUrl(item.imageUrl)} alt={item.title} />
+                  ) : (
+                      <div className="category-admin-thumb category-admin-thumb-empty">Немає фото</div>
+                  )}
+                  <div className="category-admin-info">
+                    <strong>{item.title}</strong>
+                    <span>{item.slug}</span>
+                  </div>
+                  <input
+                      ref={(node) => { categoryImageInputRefs.current[item.id] = node; }}
+                      type="file"
+                      accept="image/*"
+                      className="category-admin-file-input"
+                      onChange={(event) => {
+                        const file = event.currentTarget.files?.[0];
+                        if (file) {
+                          handleReplaceCategoryImage(item.id, item.slug, item.title, item.description, file);
+                        }
+                      }}
+                  />
+                  <button
+                      type="button"
+                      onClick={() => categoryImageInputRefs.current[item.id]?.click()}
+                  >
+                    {item.imageUrl ? 'Змінити фото' : 'Додати фото'}
+                  </button>
+                </div>
+            ))}
+          </div>
         </form>
 
         <div className="panel">

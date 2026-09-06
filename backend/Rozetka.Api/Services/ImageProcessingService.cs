@@ -32,8 +32,9 @@ public class ImageProcessingService(IWebHostEnvironment environment)
     };
 
     public async Task<ProcessedImage> ProcessAsync
-        (IFormFile file, 
-        CancellationToken cancellationToken = default)
+        (IFormFile file,
+        CancellationToken cancellationToken = default,
+        string folder = "products")
     {
         if (file.Length == 0)
         {
@@ -53,7 +54,7 @@ public class ImageProcessingService(IWebHostEnvironment environment)
         var webRoot = environment.WebRootPath ?? Path.Combine
             (AppContext.BaseDirectory, "wwwroot");
 
-        var uploadsRoot = Path.Combine(webRoot, "uploads", "products");
+        var uploadsRoot = Path.Combine(webRoot, "uploads", folder);
         Directory.CreateDirectory(uploadsRoot);
 
         var fileId = Guid.NewGuid().ToString("N");
@@ -97,7 +98,7 @@ public class ImageProcessingService(IWebHostEnvironment environment)
             await using var fileStream = File.Create(filePath);
             data.SaveTo(fileStream);
 
-            urls[name] = $"/uploads/products/{fileName}";
+            urls[name] = $"/uploads/{folder}/{fileName}";
         }
 
         return new ProcessedImage(urls["thumbnail"], urls["medium"], urls["large"]);
