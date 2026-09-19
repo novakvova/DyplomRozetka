@@ -6,6 +6,8 @@ public class User : IdentityUser<Guid>
 {
     public string FullName { get; set; } = string.Empty;
     public string City { get; set; } = string.Empty;
+    public DateOnly? BirthDate { get; set; }
+    public string? Gender { get; set; }
 
     public bool IsBlocked { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -14,4 +16,5 @@ public class User : IdentityUser<Guid>
     public ICollection<Order> Orders { get; set; } = new List<Order>();
     public ICollection<FavoriteItem> Favorites { get; set; } = new List<FavoriteItem>();
     public ICollection<Review> Reviews { get; set; } = new List<Review>();
+    public ICollection<UserAddress> Addresses { get; set; } = new List<UserAddress>();
 }

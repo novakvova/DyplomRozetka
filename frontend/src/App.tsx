@@ -4,6 +4,10 @@ import { Footer } from './components/Footer';
 import { Header } from './components/Header';
 import { AdminPage } from './pages/AdminPage';
 import { CartPage } from './pages/CartPage';
+import { CheckoutPage } from './pages/CheckoutPage';
+import { AddressFormPage } from './pages/AddressFormPage';
+import { PasswordChangePage } from './pages/PasswordChangePage';
+import { TwoFactorPage } from './pages/TwoFactorPage';
 import { CatalogPage } from './pages/CatalogPage';
 import { FavoritesPage } from './pages/FavoritesPage';
 import { MainPage } from './pages/MainPage';
@@ -61,8 +65,13 @@ function AppRoutes() {
                 <Route path="/product/:id" element={<ProductPage />} />
                 <Route path="/favorites" element={<FavoritesPage />} />
                 <Route path="/cart" element={<CartPage />} />
+                <Route path="/checkout" element={<CheckoutPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/profile/addresses/new" element={<AddressFormPage />} />
+                <Route path="/profile/addresses" element={<ProfilePage />} />
+                <Route path="/profile/password" element={<PasswordChangePage />} />
+                <Route path="/profile/2fa" element={<TwoFactorPage />} />
                 <Route
                     path="/admin"
                     element={user?.role === 'Admin' ? <AdminPage /> : <Navigate to="/" replace />}

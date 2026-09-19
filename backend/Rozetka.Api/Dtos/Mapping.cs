@@ -14,7 +14,10 @@ public static class Mapping
             user.PhoneNumber ?? string.Empty,
             user.City,
             roles.Contains(Roles.Admin) ? Roles.Admin : Roles.User,
-            user.IsBlocked);
+            user.IsBlocked,
+            user.BirthDate,
+            user.Gender,
+            user.TwoFactorEnabled);
 
     public static CategoryDto ToDto(this Category category) =>
         new(category.Id, category.Slug, category.Title, category.Description, category.ImageUrl);

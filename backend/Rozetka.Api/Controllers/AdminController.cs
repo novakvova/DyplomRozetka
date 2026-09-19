@@ -233,6 +233,21 @@ public class AdminController(AppDbContext db, UserManager<User> userManager, Ima
         return NoContent();
     }
 
+    [HttpGet("products/{productId:guid}/images")]
+    public async Task<ActionResult<IReadOnlyList<ProductImageDto>>> GetImages(Guid productId, CancellationToken cancellationToken)
+    {
+        var product = await db.Products
+            .Include(item => item.Images)
+            .SingleOrDefaultAsync(item => item.Id == productId, cancellationToken);
+
+        if (product is null)
+        {
+            return NotFound();
+        }
+
+        return product.Images.OrderBy(image => image.SortOrder).Select(image => image.ToDto()).ToList();
+    }
+
     [HttpPost("products/{productId:guid}/images")]
     [RequestSizeLimit(ValidationConstants.MaxProductImageBytes)]
     [Consumes("multipart/form-data")]

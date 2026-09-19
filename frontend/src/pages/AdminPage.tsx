@@ -1,5 +1,6 @@
 import { FormEvent, useRef, useState } from 'react';
 import { extractErrorMessage, resolveAssetUrl} from "../store/api/client";
+import { ProductImagesManager } from '../components/ProductImagesManager';
 import {
   useCreateAdminMutation,
   useCreateCategoryMutation,
@@ -9,6 +10,7 @@ import {
   useToggleUserBlockMutation,
   useToggleUserRoleMutation,
   useUpdateCategoryMutation,
+  useUploadProductImagesMutation,
 } from '../store/api/adminApi';
 import { useGetCategoriesQuery, useGetProductsQuery } from '../store/api/catalogApi';
 import { useAppDispatch } from '../store/hooks';
@@ -22,6 +24,7 @@ export function AdminPage() {
   const { data: users = [] } = useGetUsersQuery();
   const [createProduct] = useCreateProductMutation();
   const [deleteProduct] = useDeleteProductMutation();
+  const [uploadProductImages] = useUploadProductImagesMutation();
   const [createCategory] = useCreateCategoryMutation();
   const [updateCategory] = useUpdateCategoryMutation();
   const [createAdmin] = useCreateAdminMutation();
@@ -32,10 +35,12 @@ export function AdminPage() {
 
   async function handleCreateProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const imageFiles = (data.getAll('images') as File[]).filter((file) => file.size > 0);
 
     try {
-      await createProduct({
+      const product = await createProduct({
         sku: data.get('sku') as string,
         title: data.get('title') as string,
         subtitle: data.get('subtitle') as string,
@@ -50,7 +55,12 @@ export function AdminPage() {
         stockQuantity: Number(data.get('stockQuantity')),
         categoryId: data.get('categoryId') as string,
       }).unwrap();
-      event.currentTarget.reset();
+
+      if (imageFiles.length > 0) {
+        await uploadProductImages({ productId: product.id, files: imageFiles }).unwrap();
+      }
+
+      form.reset();
       dispatch(messageSet('Товар додано.'));
     } catch (error) {
       dispatch(messageSet(extractErrorMessage(error, 'Не вдалося додати товар.')));
@@ -127,6 +137,10 @@ export function AdminPage() {
           <input name="previousPrice" type="number" placeholder="Стара ціна" />
           <input name="badge" placeholder="Бейдж" />
           <input name="imageUrl" placeholder="URL зображення" defaultValue="https://placehold.co/640x480/f5f7fb/1f2937?text=Rozetka" />
+          <label className="file-field">
+            <span>Додаткові фото (можна вибрати декілька)</span>
+            <input name="images" type="file" accept="image/*" multiple />
+          </label>
           <input name="manufacturerUrl" placeholder="Офіційний сайт виробника" />
           <textarea name="specifications" placeholder="Характеристики" defaultValue="Гарантія: 12 місяців" />
           <textarea name="description" placeholder="Опис товару" />
@@ -140,10 +154,13 @@ export function AdminPage() {
         <div className="panel">
           <h2>Список товарів</h2>
           {products.map((item) => (
-              <article className="row" key={item.id}>
-                <strong>{item.title}</strong>
-                <span>{item.category.title}</span>
-                <button onClick={() => deleteProduct(item.id)}>Видалити</button>
+              <article className="row product-admin-row" key={item.id}>
+                <div className="product-admin-row-head">
+                  <strong>{item.title}</strong>
+                  <span>{item.category.title}</span>
+                  <button onClick={() => deleteProduct(item.id)}>Видалити</button>
+                </div>
+                <ProductImagesManager productId={item.id} />
               </article>
           ))}
         </div>

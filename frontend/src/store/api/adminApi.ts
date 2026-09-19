@@ -1,5 +1,5 @@
 import { apiSlice } from '../apiSlice';
-import type { Category, Product, User } from '../../types';
+import type { Category, Product, ProductImage, User } from '../../types';
 
 type ProductRequest = {
     sku: string;
@@ -77,6 +77,22 @@ export const adminApi = apiSlice.injectEndpoints({
             query: (id) => ({ url: `/admin/users/${id}/role`, method: 'PUT' }),
             invalidatesTags: ['Users'],
         }),
+        getProductImages: builder.query<ProductImage[], string>({
+            query: (productId) => `/admin/products/${productId}/images`,
+            providesTags: (_result, _error, productId) => [{ type: 'ProductImages', id: productId }],
+        }),
+        uploadProductImages: builder.mutation<ProductImage[], { productId: string; files: File[] }>({
+            query: ({ productId, files }) => {
+                const form = new FormData();
+                files.forEach((file) => form.append('File', file));
+                return { url: `/admin/products/${productId}/images`, method: 'POST', body: form };
+            },
+            invalidatesTags: (_result, _error, { productId }) => [{ type: 'ProductImages', id: productId }, 'Products'],
+        }),
+        deleteProductImage: builder.mutation<void, { productId: string; imageId: string }>({
+            query: ({ productId, imageId }) => ({ url: `/admin/products/${productId}/images/${imageId}`, method: 'DELETE' }),
+            invalidatesTags: (_result, _error, { productId }) => [{ type: 'ProductImages', id: productId }, 'Products'],
+        }),
     }),
 });
 
@@ -89,4 +105,7 @@ export const {
     useCreateAdminMutation,
     useToggleUserBlockMutation,
     useToggleUserRoleMutation,
+    useGetProductImagesQuery,
+    useUploadProductImagesMutation,
+    useDeleteProductImageMutation,
 } = adminApi;

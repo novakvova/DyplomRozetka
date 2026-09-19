@@ -1,13 +1,14 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ChevronLeft, ChevronRight, LogOut, Menu, PackageSearch, Search, Settings, User } from 'lucide-react';
+import { useRef, useState, type FormEvent } from 'react';
+import { ChevronLeft, ChevronRight, Menu } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { resolveAssetUrl} from "../store/api/client";
 import { getCategoryIcon } from '../data/categoryIcons';
+import { AccountDrawer } from './AccountDrawer';
+import { AuthModal } from './AuthModal';
 import { useGetCartQuery } from '../store/api/cartApi';
 import { useGetCategoriesQuery } from '../store/api/catalogApi';
 import { useGetFavoritesQuery } from '../store/api/favoritesApi';
-import { logout } from '../store/authSlice';
-import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { useAppSelector } from '../store/hooks';
 
 function SolidHeartIcon({ size = 24 }: { size?: number }) {
     return (
@@ -41,9 +42,17 @@ function SolidBagIcon({ size = 24 }: { size?: number }) {
     );
 }
 
+function SearchGlyph() {
+    return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2.4" />
+            <line x1="16.2" y1="16.2" x2="21" y2="21" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+        </svg>
+    );
+}
+
 export function Header() {
     const navigate = useNavigate();
-    const dispatch = useAppDispatch();
     const user = useAppSelector((state) => state.auth.user);
     const { data: cart } = useGetCartQuery(undefined, { skip: !user });
     const { data: favorites = [] } = useGetFavoritesQuery(undefined, { skip: !user });
@@ -51,25 +60,9 @@ export function Header() {
     const cartItemsCount = (cart?.items ?? []).reduce((total, item) => total + item.quantity, 0);
 
     const [search, setSearch] = useState('');
-    const [accountOpen, setAccountOpen] = useState(false);
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [authModalOpen, setAuthModalOpen] = useState(false);
     const stripRef = useRef<HTMLDivElement | null>(null);
-    const accountRef = useRef<HTMLDivElement | null>(null);
-
-    useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            if (accountRef.current && !accountRef.current.contains(event.target as Node)) {
-                setAccountOpen(false);
-            }
-        }
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    function handleLogout() {
-        setAccountOpen(false);
-        dispatch(logout());
-        navigate('/');
-    }
 
     function handleSearch(event: FormEvent) {
         event.preventDefault();
@@ -83,7 +76,13 @@ export function Header() {
     return (
         <header className="site-header">
             <div className="topbar">
-                <button type="button" className="hamburger-button" onClick={() => navigate('/catalog')} aria-label="Каталог товарів">
+                <button
+                    type="button"
+                    className="hamburger-button"
+                    onClick={() => setDrawerOpen(true)}
+                    aria-label="Меню акаунта"
+                    aria-expanded={drawerOpen}
+                >
                     <Menu size={27} strokeWidth={1.9} />
                 </button>
 
@@ -101,7 +100,7 @@ export function Header() {
                         aria-label="Пошук товарів"
                     />
                     <button type="submit" aria-label="Знайти">
-                        <Search size={20} strokeWidth={2.4} />
+                        <SearchGlyph />
                     </button>
                 </form>
 
@@ -111,45 +110,14 @@ export function Header() {
                         {favorites.length > 0 && <span className="icon-badge">{favorites.length}</span>}
                     </NavLink>
 
-                    <div className="account-menu-wrap" ref={accountRef}>
-                        <button
-                            type="button"
-                            className="icon-action"
-                            aria-label="Акаунт"
-                            aria-expanded={accountOpen}
-                            onClick={() => setAccountOpen((open) => !open)}
-                        >
-                            <SolidUserIcon size={26} />
-                        </button>
-
-                        {accountOpen && (
-                            <div className="account-menu">
-                                {user ? (
-                                    <>
-                                        <div className="account-menu-name">{user.fullName}</div>
-                                        <NavLink to="/profile" onClick={() => setAccountOpen(false)}>
-                                            <User size={15} /> Профіль
-                                        </NavLink>
-                                        <NavLink to="/orders" onClick={() => setAccountOpen(false)}>
-                                            <PackageSearch size={15} /> Мої замовлення
-                                        </NavLink>
-                                        {user.role === 'Admin' && (
-                                            <NavLink to="/admin" onClick={() => setAccountOpen(false)}>
-                                                <Settings size={15} /> Адмінка
-                                            </NavLink>
-                                        )}
-                                        <button type="button" className="account-menu-logout" onClick={handleLogout}>
-                                            <LogOut size={15} /> Вийти
-                                        </button>
-                                    </>
-                                ) : (
-                                    <NavLink to="/profile" onClick={() => setAccountOpen(false)}>
-                                        <User size={15} /> Увійти або зареєструватися
-                                    </NavLink>
-                                )}
-                            </div>
-                        )}
-                    </div>
+                    <button
+                        type="button"
+                        className="icon-action"
+                        aria-label="Акаунт"
+                        onClick={() => (user ? navigate('/profile') : setAuthModalOpen(true))}
+                    >
+                        <SolidUserIcon size={26} />
+                    </button>
 
                     <NavLink to="/cart" className="icon-action icon-action-cart" aria-label="Кошик">
                         <SolidBagIcon size={26} />
@@ -188,6 +156,9 @@ export function Header() {
                     <ChevronRight size={18} />
                 </button>
             </div>
+
+            <AccountDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} onOpenAuth={() => setAuthModalOpen(true)} />
+            <AuthModal open={authModalOpen} onClose={() => setAuthModalOpen(false)} />
         </header>
     );
 }

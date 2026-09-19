@@ -1,5 +1,5 @@
 import { GitCompare, Heart, ShoppingCart, Star } from 'lucide-react';
-import { formatPrice } from '../api/client';
+import { formatPrice, resolveAssetUrl} from "../store/api/client";
 import type { Product } from '../types';
 
 type ProductGridProps = {
@@ -30,7 +30,7 @@ export function ProductGrid({ products, favoriteProductIds, onOpen, onAddToCart,
                 {hasDiscount && <span className="discount-chip">-{discountPercent}%</span>}
 
                 <div className="product-media" onClick={() => onOpen(product)}>
-                  <img src={product.imageUrl} alt={product.title} loading="lazy" />
+                  {product.imageUrl && <img src={resolveAssetUrl(product.imageUrl)} alt={product.title} loading="lazy" />}
                 </div>
 
                 {product.badge && <span className="badge">{product.badge}</span>}

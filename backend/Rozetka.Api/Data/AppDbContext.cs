@@ -16,6 +16,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
+    public DbSet<UserAddress> UserAddresses => Set<UserAddress>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -110,6 +111,24 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
                 .WithMany()
                 .HasForeignKey(item => item.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<UserAddress>(entity =>
+        {
+            entity.Property(item => item.AddressType).HasMaxLength(40);
+            entity.Property(item => item.RecipientName).HasMaxLength(160);
+            entity.Property(item => item.Phone).HasMaxLength(40);
+            entity.Property(item => item.Country).HasMaxLength(80);
+            entity.Property(item => item.City).HasMaxLength(120);
+            entity.Property(item => item.PostalCode).HasMaxLength(20);
+            entity.Property(item => item.Street).HasMaxLength(200);
+            entity.Property(item => item.House).HasMaxLength(40);
+            entity.Property(item => item.Apartment).HasMaxLength(40);
+            entity.Property(item => item.Notes).HasMaxLength(400);
+            entity.HasOne(item => item.User)
+                .WithMany(item => item.Addresses)
+                .HasForeignKey(item => item.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<ProductImage>(entity =>

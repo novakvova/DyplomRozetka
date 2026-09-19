@@ -10,6 +10,8 @@ type RegisterRequest = LoginRequest & {
     fullName: string;
     phone: string;
     city: string;
+    birthDate?: string | null;
+    gender?: string | null;
 };
 
 type RecoverRequest = {
@@ -59,6 +61,10 @@ export const authApi = apiSlice.injectEndpoints({
         changePassword: builder.mutation<void, PasswordChangeRequest>({
             query: (body) => ({ url: '/auth/password', method: 'PUT', body }),
         }),
+        setTwoFactor: builder.mutation<User, { enabled: boolean; password?: string }>({
+            query: (body) => ({ url: '/auth/two-factor', method: 'PUT', body }),
+            invalidatesTags: ['Auth'],
+        }),
     }),
 });
 
@@ -70,4 +76,5 @@ export const {
     useGoogleLoginMutation,
     useUpdateProfileMutation,
     useChangePasswordMutation,
+    useSetTwoFactorMutation,
 } = authApi;
