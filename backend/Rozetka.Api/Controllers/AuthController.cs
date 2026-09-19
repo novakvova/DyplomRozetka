@@ -25,7 +25,9 @@ public class AuthController(UserManager<User> userManager, JwtTokenService jwtTo
             Email = email,
             FullName = request.FullName.Trim(),
             PhoneNumber = request.Phone.Trim(),
-            City = request.City.Trim()
+            City = request.City.Trim(),
+            BirthDate = request.BirthDate,
+            Gender = string.IsNullOrWhiteSpace(request.Gender) ? null : request.Gender.Trim()
         };
 
         var createResult = await userManager.CreateAsync(user, request.Password);
@@ -187,6 +189,31 @@ public class AuthController(UserManager<User> userManager, JwtTokenService jwtTo
         {
             return Unauthorized();
         }
+
+        var roles = await userManager.GetRolesAsync(user);
+        return user.ToDto(roles);
+    }
+
+    [Authorize]
+    [HttpPut("two-factor")]
+    public async Task<ActionResult<UserDto>> SetTwoFactor(TwoFactorRequest request)
+    {
+        var userId = CurrentUser.GetUserId(User);
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return Unauthorized();
+        }
+
+        if (!request.Enabled)
+        {
+            if (string.IsNullOrWhiteSpace(request.Password) || !await userManager.CheckPasswordAsync(user, request.Password))
+            {
+                return BadRequest("Невірний пароль.");
+            }
+        }
+
+        await userManager.SetTwoFactorEnabledAsync(user, request.Enabled);
 
         var roles = await userManager.GetRolesAsync(user);
         return user.ToDto(roles);

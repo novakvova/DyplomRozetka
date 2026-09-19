@@ -49,29 +49,29 @@ public class CartController(AppDbContext db) : ControllerBase
             return NotFound(ErrorMessages.ProductNotFound);
         }
 
-        var quantity = Math.Clamp(request.Quantity, 
-            ValidationConstants.MinCartLength, 
+        var quantity = Math.Clamp(request.Quantity,
+            ValidationConstants.MinCartLength,
             ValidationConstants.MaxCartLength);
 
         var existing = await db.CartItems.SingleOrDefaultAsync
-            (item => item.UserId == userId && item.ProductId == 
+            (item => item.UserId == userId && item.ProductId ==
             request.ProductId, cancellationToken);
 
 
         if (existing is null)
         {
-            db.CartItems.Add(new CartItem 
-            { 
-                UserId = userId, 
+            db.CartItems.Add(new CartItem
+            {
+                UserId = userId,
                 ProductId = request.ProductId,
-                Quantity = quantity 
+                Quantity = quantity
             });
         }
         else
         {
             existing.Quantity = Math.Clamp
-                (existing.Quantity + quantity, 
-                ValidationConstants.MinCartLength, 
+                (existing.Quantity + quantity,
+                ValidationConstants.MinCartLength,
                 ValidationConstants.MaxCartLength);
         }
 
@@ -102,7 +102,7 @@ public class CartController(AppDbContext db) : ControllerBase
         }
 
         item.Quantity = Math.Clamp
-            (request.Quantity, 
+            (request.Quantity,
             ValidationConstants.MinCartLength,
             ValidationConstants.MaxCartLength);
 
@@ -125,12 +125,37 @@ public class CartController(AppDbContext db) : ControllerBase
         }
 
         var item = await db.CartItems.SingleOrDefaultAsync
-            (cartItem => cartItem.Id == id && cartItem.UserId == userId, 
+            (cartItem => cartItem.Id == id && cartItem.UserId == userId,
             cancellationToken);
 
         if (item is not null)
         {
             db.CartItems.Remove(item);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return (await LoadCart(userId)
+            .ToListAsync(cancellationToken))
+            .ToCartDto();
+    }
+
+    [HttpDelete("items")]
+    public async Task<ActionResult<CartDto>> Clear(CancellationToken cancellationToken)
+    {
+        var userId = CurrentUser.GetUserId(User);
+
+        if (!await UserExists(userId, cancellationToken))
+        {
+            return Unauthorized(ErrorMessages.SessionExpired);
+        }
+
+        var items = await db.CartItems
+            .Where(cartItem => cartItem.UserId == userId)
+            .ToListAsync(cancellationToken);
+
+        if (items.Count > 0)
+        {
+            db.CartItems.RemoveRange(items);
             await db.SaveChangesAsync(cancellationToken);
         }
 

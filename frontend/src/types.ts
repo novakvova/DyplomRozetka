@@ -16,6 +16,9 @@ export type User = {
   city: string;
   role: UserRole;
   isBlocked: boolean;
+  birthDate?: string | null;
+  gender?: string | null;
+  twoFactorEnabled: boolean;
 };
 
 export type AuthResponse = {
@@ -31,6 +34,14 @@ export type Category = {
   imageUrl: string;
 };
 
+export type ProductImage = {
+  id: string;
+  thumbnailUrl: string;
+  mediumUrl: string;
+  largeUrl: string;
+  sortOrder: number;
+};
+
 export type Product = {
   id: string;
   sku: string;
@@ -44,6 +55,7 @@ export type Product = {
   reviewsCount: number;
   imageUrl: string;
   imageUrls: string[];
+  images: ProductImage[];
   description: string;
   manufacturerUrl: string;
   specifications: string;
@@ -96,3 +108,19 @@ export type Order = {
     quantity: number;
   }[];
 };
+export type UserAddress = {
+  id: string;
+  addressType: string;
+  recipientName: string;
+  phone: string;
+  country: string;
+  city: string;
+  postalCode: string;
+  street: string;
+  house: string;
+  apartment: string;
+  notes: string;
+  isDefault: boolean;
+};
+
+export type UserAddressRequest = Omit<UserAddress, 'id'>;

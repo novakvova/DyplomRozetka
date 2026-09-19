@@ -14,6 +14,9 @@ public static class SeedData
         await EnsureProductImagesTableAsync(db);
         await EnsureProductCreatedAtColumnAsync(db);
         await EnsureCategoryImageUrlColumnAsync(db);
+        await EnsureCartFavoritesReviewsOrdersTablesAsync(db);
+        await EnsureUserAddressesTableAsync(db);
+        await EnsureUserProfileColumnsAsync(db);
 
         await EnsureRoleAsync(roleManager, Roles.Admin);
         await EnsureRoleAsync(roleManager, Roles.User);
@@ -271,6 +274,104 @@ public static class SeedData
         await db.Database.ExecuteSqlRawAsync("""
             ALTER TABLE "Categories"
             ADD COLUMN IF NOT EXISTS "ImageUrl" varchar(500) NOT NULL DEFAULT '';
+            """);
+    }
+
+    private static async Task EnsureUserProfileColumnsAsync(AppDbContext db)
+    {
+        await db.Database.ExecuteSqlRawAsync("""
+            ALTER TABLE "AspNetUsers"
+            ADD COLUMN IF NOT EXISTS "BirthDate" date NULL;
+            ALTER TABLE "AspNetUsers"
+            ADD COLUMN IF NOT EXISTS "Gender" varchar(20) NULL;
+            """);
+    }
+
+    private static async Task EnsureUserAddressesTableAsync(AppDbContext db)
+    {
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS "UserAddresses" (
+                "Id" uuid NOT NULL PRIMARY KEY,
+                "UserId" uuid NOT NULL,
+                "AddressType" varchar(40) NOT NULL DEFAULT '',
+                "RecipientName" varchar(160) NOT NULL DEFAULT '',
+                "Phone" varchar(40) NOT NULL DEFAULT '',
+                "Country" varchar(80) NOT NULL DEFAULT '',
+                "City" varchar(120) NOT NULL DEFAULT '',
+                "PostalCode" varchar(20) NOT NULL DEFAULT '',
+                "Street" varchar(200) NOT NULL DEFAULT '',
+                "House" varchar(40) NOT NULL DEFAULT '',
+                "Apartment" varchar(40) NOT NULL DEFAULT '',
+                "Notes" varchar(400) NOT NULL DEFAULT '',
+                "IsDefault" boolean NOT NULL DEFAULT FALSE,
+                "CreatedAt" timestamp with time zone NOT NULL DEFAULT NOW(),
+                CONSTRAINT "FK_UserAddresses_AspNetUsers_UserId" FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS "IX_UserAddresses_UserId" ON "UserAddresses" ("UserId");
+            """);
+    }
+
+    private static async Task EnsureCartFavoritesReviewsOrdersTablesAsync(AppDbContext db)
+    {
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS "CartItems" (
+                "Id" uuid NOT NULL PRIMARY KEY,
+                "UserId" uuid NOT NULL,
+                "ProductId" uuid NOT NULL,
+                "Quantity" integer NOT NULL,
+                CONSTRAINT "FK_CartItems_AspNetUsers_UserId" FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE,
+                CONSTRAINT "FK_CartItems_Products_ProductId" FOREIGN KEY ("ProductId") REFERENCES "Products" ("Id") ON DELETE RESTRICT
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_CartItems_UserId_ProductId" ON "CartItems" ("UserId", "ProductId");
+
+            CREATE TABLE IF NOT EXISTS "FavoriteItems" (
+                "Id" uuid NOT NULL PRIMARY KEY,
+                "UserId" uuid NOT NULL,
+                "ProductId" uuid NOT NULL,
+                "CreatedAt" timestamp with time zone NOT NULL,
+                CONSTRAINT "FK_FavoriteItems_AspNetUsers_UserId" FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE,
+                CONSTRAINT "FK_FavoriteItems_Products_ProductId" FOREIGN KEY ("ProductId") REFERENCES "Products" ("Id") ON DELETE RESTRICT
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_FavoriteItems_UserId_ProductId" ON "FavoriteItems" ("UserId", "ProductId");
+
+            CREATE TABLE IF NOT EXISTS "Reviews" (
+                "Id" uuid NOT NULL PRIMARY KEY,
+                "UserId" uuid NOT NULL,
+                "ProductId" uuid NOT NULL,
+                "Rating" integer NOT NULL,
+                "Text" varchar(1200) NOT NULL,
+                "CreatedAt" timestamp with time zone NOT NULL,
+                CONSTRAINT "FK_Reviews_AspNetUsers_UserId" FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE,
+                CONSTRAINT "FK_Reviews_Products_ProductId" FOREIGN KEY ("ProductId") REFERENCES "Products" ("Id") ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS "Orders" (
+                "Id" uuid NOT NULL PRIMARY KEY,
+                "Number" text NOT NULL,
+                "UserId" uuid NOT NULL,
+                "RecipientFullName" text NOT NULL,
+                "RecipientPhone" text NOT NULL,
+                "City" text NOT NULL,
+                "DeliveryPoint" text NOT NULL,
+                "PaymentMethod" text NOT NULL,
+                "Comment" text NOT NULL,
+                "Status" integer NOT NULL,
+                "Total" numeric(12,2) NOT NULL,
+                "CreatedAt" timestamp with time zone NOT NULL,
+                CONSTRAINT "FK_Orders_AspNetUsers_UserId" FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_Orders_Number" ON "Orders" ("Number");
+
+            CREATE TABLE IF NOT EXISTS "OrderItems" (
+                "Id" uuid NOT NULL PRIMARY KEY,
+                "OrderId" uuid NOT NULL,
+                "ProductId" uuid NOT NULL,
+                "ProductTitle" text NOT NULL,
+                "UnitPrice" numeric(12,2) NOT NULL,
+                "Quantity" integer NOT NULL,
+                CONSTRAINT "FK_OrderItems_Orders_OrderId" FOREIGN KEY ("OrderId") REFERENCES "Orders" ("Id") ON DELETE CASCADE,
+                CONSTRAINT "FK_OrderItems_Products_ProductId" FOREIGN KEY ("ProductId") REFERENCES "Products" ("Id") ON DELETE RESTRICT
+            );
             """);
     }
 }
