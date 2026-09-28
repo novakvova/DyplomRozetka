@@ -16,7 +16,8 @@ namespace Rozetka.Api.Controllers;
 public class AuthController(
     UserManager<User> userManager,
     JwtTokenService jwtTokenService,
-    IOptions<AuthOptions> authOptions
+    IOptions<AuthOptions> authOptions,
+    IOptions<GoogleAuthOptions> googleAuthOptions
 ) : ControllerBase
 {
     [HttpPost("register")]
