@@ -20,9 +20,7 @@ type RecoverRequest = {
 };
 
 type GoogleLoginRequest = {
-    email: string;
-    fullName: string;
-    googleToken: string;
+    credential: string;
 };
 
 type ProfileUpdateRequest = {

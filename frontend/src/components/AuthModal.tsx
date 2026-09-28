@@ -1,12 +1,18 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { ChevronLeft, Eye, EyeOff, X } from 'lucide-react';
-import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
-import { extractErrorMessage } from '../store/api/client';
-import { useLoginMutation, useRegisterMutation } from '../store/api/authApi';
-import { credentialsSet } from '../store/authSlice';
-import { useAppDispatch } from '../store/hooks';
-import { messageSet } from '../store/uiSlice';
+import {useEffect, useState, type FormEvent} from 'react';
+import {ChevronLeft, Eye, EyeOff, X} from 'lucide-react';
+import {createPortal} from 'react-dom';
+import {useNavigate} from 'react-router-dom';
+import {extractErrorMessage} from '../store/api/client';
+import {
+    useGoogleLoginMutation,
+    useLoginMutation,
+    useRegisterMutation,
+} from '../store/api/authApi';
+
+import {GoogleLogin} from '@react-oauth/google';
+import {credentialsSet} from '../store/authSlice';
+import {useAppDispatch} from '../store/hooks';
+import {messageSet} from '../store/uiSlice';
 
 type AuthModalProps = {
     open: boolean;
@@ -45,21 +51,22 @@ function Logo() {
     );
 }
 
-function Dots({ step }: { step: RegisterStep }) {
+function Dots({step}: { step: RegisterStep }) {
     return (
         <div className="auth-modal-dots">
             {[1, 2, 3, 4].map((dot) => (
-                <span key={dot} className={`auth-modal-dot${dot <= step ? ' auth-modal-dot-filled' : ''}`} />
+                <span key={dot} className={`auth-modal-dot${dot <= step ? ' auth-modal-dot-filled' : ''}`}/>
             ))}
         </div>
     );
 }
 
-export function AuthModal({ open, onClose }: AuthModalProps) {
+export function AuthModal({open, onClose}: AuthModalProps) {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
-    const [login, { isLoading: loginLoading }] = useLoginMutation();
-    const [register, { isLoading: registerLoading }] = useRegisterMutation();
+    const [login, {isLoading: loginLoading}] = useLoginMutation();
+    const [register, {isLoading: registerLoading}] = useRegisterMutation();
+    const [googleLogin] = useGoogleLoginMutation();
 
     const [mode, setMode] = useState<'login' | 'register'>('register');
     const [step, setStep] = useState<RegisterStep>(1);
@@ -69,9 +76,11 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
 
     useEffect(() => {
         if (!open) return;
+
         function handleKeyDown(event: KeyboardEvent) {
             if (event.key === 'Escape') onClose();
         }
+
         document.addEventListener('keydown', handleKeyDown);
         document.body.style.overflow = 'hidden';
         return () => {
@@ -91,7 +100,7 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
     if (!open) return null;
 
     function update<K extends keyof RegisterForm>(key: K, value: RegisterForm[K]) {
-        setForm((current) => ({ ...current, [key]: value }));
+        setForm((current) => ({...current, [key]: value}));
     }
 
     function handleStep1(event: FormEvent<HTMLFormElement>) {
@@ -153,6 +162,31 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
         }
     }
 
+    async function handleGoogleLogin(credential: string) {
+        try {
+            const response = await googleLogin({
+                credential,
+            }).unwrap();
+
+            dispatch(credentialsSet(response));
+
+            dispatch(
+                messageSet(`Вітаємо, ${response.user.fullName}!`)
+            );
+
+            onClose();
+        } catch (error) {
+            dispatch(
+                messageSet(
+                    extractErrorMessage(
+                        error,
+                        'Не вдалося увійти через Google.'
+                    )
+                )
+            );
+        }
+    }
+
     function goBack() {
         setStep((current) => (current > 1 ? ((current - 1) as RegisterStep) : current));
     }
@@ -163,12 +197,12 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
                 <div className="auth-modal-top">
                     {mode === 'register' && step > 1 && step < 4 ? (
                         <button type="button" className="auth-modal-nav-button" onClick={goBack} aria-label="Назад">
-                            <ChevronLeft size={20} />
+                            <ChevronLeft size={20}/>
                         </button>
-                    ) : <span />}
-                    <Logo />
+                    ) : <span/>}
+                    <Logo/>
                     <button type="button" className="auth-modal-nav-button" onClick={onClose} aria-label="Закрити">
-                        <X size={18} />
+                        <X size={18}/>
                     </button>
                 </div>
 
@@ -176,14 +210,40 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
                     <div className="auth-modal-step" key="login">
                         <h2 className="auth-modal-title">Вхід</h2>
                         <form onSubmit={handleLogin} className="auth-modal-form">
-                            <input name="email" type="email" placeholder="E-mail" required />
-                            <input name="password" type="password" placeholder="Пароль" required />
+                            <input name="email" type="email" placeholder="E-mail" required/>
+                            <input name="password" type="password" placeholder="Пароль" required/>
                             <button className="primary auth-modal-submit" disabled={loginLoading}>
                                 {loginLoading ? 'Зачекайте...' : 'Увійти'}
                             </button>
                         </form>
+                        <div className="auth-modal-google">
+                            <GoogleLogin
+                                onSuccess={(credentialResponse) => {
+                                    if (!credentialResponse.credential) {
+                                        dispatch(
+                                            messageSet(
+                                                'Google не повернув дані авторизації.'
+                                            )
+                                        );
+                                        return;
+                                    }
+
+                                    void handleGoogleLogin(
+                                        credentialResponse.credential
+                                    );
+                                }}
+                                onError={() => {
+                                    dispatch(
+                                        messageSet(
+                                            'Не вдалося увійти через Google.'
+                                        )
+                                    );
+                                }}
+                            />
+                        </div>
                         <p className="auth-modal-switch">
-                            Ще немає акаунта? <button type="button" onClick={() => setMode('register')}>Зареєструватись</button>
+                            Ще немає акаунта? <button type="button"
+                                                      onClick={() => setMode('register')}>Зареєструватись</button>
                         </p>
                     </div>
                 )}
@@ -192,26 +252,32 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
                     <div className="auth-modal-step" key="step1">
                         <h2 className="auth-modal-title">Зареєструватись</h2>
                         <form onSubmit={handleStep1} className="auth-modal-form">
-                            <input value={form.firstName} onChange={(e) => update('firstName', e.target.value)} placeholder="Ім'я" required />
-                            <input value={form.lastName} onChange={(e) => update('lastName', e.target.value)} placeholder="Прізвище" required />
-                            <input value={form.phone} onChange={(e) => update('phone', e.target.value)} placeholder="Телефон" type="tel" required />
-                            <input value={form.email} onChange={(e) => update('email', e.target.value)} placeholder="E-mail" type="email" required />
+                            <input value={form.firstName} onChange={(e) => update('firstName', e.target.value)}
+                                   placeholder="Ім'я" required/>
+                            <input value={form.lastName} onChange={(e) => update('lastName', e.target.value)}
+                                   placeholder="Прізвище" required/>
+                            <input value={form.phone} onChange={(e) => update('phone', e.target.value)}
+                                   placeholder="Телефон" type="tel" required/>
+                            <input value={form.email} onChange={(e) => update('email', e.target.value)}
+                                   placeholder="E-mail" type="email" required/>
                             <button className="primary auth-modal-submit">Далі</button>
                         </form>
                         <p className="auth-modal-disclaimer">
-                            Продовжуючи, ви підтверджуєте, що згідні увійти до облікового запису Lumio та надасте згоду на обробку персональних даних
+                            Продовжуючи, ви підтверджуєте, що згідні увійти до облікового запису Lumio та надасте згоду
+                            на обробку персональних даних
                         </p>
                         <p className="auth-modal-switch">
                             Вже є акаунт? <button type="button" onClick={() => setMode('login')}>Увійти</button>
                         </p>
-                        <Dots step={1} />
+                        <Dots step={1}/>
                     </div>
                 )}
 
                 {mode === 'register' && step === 2 && (
                     <div className="auth-modal-step" key="step2">
                         <h2 className="auth-modal-title">Створіть пароль</h2>
-                        <p className="auth-modal-subtitle">Пароль повинен містити щонайменше 8 символів, цифр та літер</p>
+                        <p className="auth-modal-subtitle">Пароль повинен містити щонайменше 8 символів, цифр та
+                            літер</p>
                         <form onSubmit={handleStep2} className="auth-modal-form">
                             <div className="auth-modal-password-field">
                                 <input
@@ -221,8 +287,9 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
                                     type={showPassword ? 'text' : 'password'}
                                     required
                                 />
-                                <button type="button" onClick={() => setShowPassword((v) => !v)} aria-label="Показати пароль">
-                                    {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                                <button type="button" onClick={() => setShowPassword((v) => !v)}
+                                        aria-label="Показати пароль">
+                                    {showPassword ? <EyeOff size={17}/> : <Eye size={17}/>}
                                 </button>
                             </div>
                             <div className="auth-modal-password-field">
@@ -233,20 +300,22 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
                                     type={showPasswordConfirm ? 'text' : 'password'}
                                     required
                                 />
-                                <button type="button" onClick={() => setShowPasswordConfirm((v) => !v)} aria-label="Показати пароль">
-                                    {showPasswordConfirm ? <EyeOff size={17} /> : <Eye size={17} />}
+                                <button type="button" onClick={() => setShowPasswordConfirm((v) => !v)}
+                                        aria-label="Показати пароль">
+                                    {showPasswordConfirm ? <EyeOff size={17}/> : <Eye size={17}/>}
                                 </button>
                             </div>
                             <button className="primary auth-modal-submit">Далі</button>
                         </form>
-                        <Dots step={2} />
+                        <Dots step={2}/>
                     </div>
                 )}
 
                 {mode === 'register' && step === 3 && (
                     <div className="auth-modal-step" key="step3">
                         <h2 className="auth-modal-title">Дата народження</h2>
-                        <p className="auth-modal-subtitle">Заповніть додаткову інформацію, щоб зробити покупки ще зручнішими</p>
+                        <p className="auth-modal-subtitle">Заповніть додаткову інформацію, щоб зробити покупки ще
+                            зручнішими</p>
                         <form onSubmit={handleStep3} className="auth-modal-form">
                             <label className="auth-modal-field-label">
                                 День народження
@@ -286,7 +355,7 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
                                 {registerLoading ? 'Зачекайте...' : 'Далі'}
                             </button>
                         </form>
-                        <Dots step={3} />
+                        <Dots step={3}/>
                     </div>
                 )}
 
@@ -294,20 +363,20 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
                     <div className="auth-modal-step auth-modal-success" key="step4">
                         <div className="auth-modal-checkmark">
                             <svg viewBox="0 0 52 52">
-                                <circle cx="26" cy="26" r="24" className="auth-modal-checkmark-circle" />
-                                <path d="M14 27l8 8 16-16" className="auth-modal-checkmark-path" />
+                                <circle cx="26" cy="26" r="24" className="auth-modal-checkmark-circle"/>
+                                <path d="M14 27l8 8 16-16" className="auth-modal-checkmark-path"/>
                             </svg>
-                            <span className="auth-modal-confetti auth-modal-confetti-1" />
-                            <span className="auth-modal-confetti auth-modal-confetti-2" />
-                            <span className="auth-modal-confetti auth-modal-confetti-3" />
-                            <span className="auth-modal-confetti auth-modal-confetti-4" />
+                            <span className="auth-modal-confetti auth-modal-confetti-1"/>
+                            <span className="auth-modal-confetti auth-modal-confetti-2"/>
+                            <span className="auth-modal-confetti auth-modal-confetti-3"/>
+                            <span className="auth-modal-confetti auth-modal-confetti-4"/>
                         </div>
                         <h2 className="auth-modal-title">Реєстрація успішна!</h2>
                         <p className="auth-modal-subtitle">Ласкаво просимо до Lumio, будемо раді бачити вас знову.</p>
                         <button className="primary auth-modal-submit" type="button" onClick={handleFinish}>
                             Перейти до покупок
                         </button>
-                        <Dots step={4} />
+                        <Dots step={4}/>
                     </div>
                 )}
             </div>
