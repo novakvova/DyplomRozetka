@@ -314,7 +314,46 @@ public class AdminController(AppDbContext db, UserManager<User> userManager, Ima
 
         return NoContent();
     }
+    [HttpGet("orders")]
+    public async Task<ActionResult<IReadOnlyList<OrderDto>>> GetOrders(
+    CancellationToken cancellationToken)
+    {
+        var orders = await db.Orders
+            .Include(x => x.Items)
+            .Include(x => x.User)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync(cancellationToken);
 
+        return orders.Select(x => x.ToDto()).ToList();
+    }
+
+    [HttpPut("orders/{id:guid}/status")]
+    public async Task<ActionResult<OrderDto>> UpdateOrderStatus(
+        Guid id,
+        UpdateOrderStatusRequest request,
+        CancellationToken cancellationToken)
+    {
+        var order = await db.Orders
+            .Include(x => x.Items)
+            .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (order is null)
+            return NotFound("Замовлення не знайдено.");
+
+        if (!Enum.TryParse<OrderStatus>(
+                request.Status,
+                true,
+                out var status))
+        {
+            return BadRequest("Некоректний статус замовлення.");
+        }
+
+        order.Status = status;
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        return order.ToDto();
+    }
     private static void Apply(Product product, ProductUpsertRequest request)
     {
         product.Sku = request.Sku.Trim();

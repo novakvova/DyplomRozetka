@@ -49,7 +49,7 @@ export type Product = {
   subtitle: string;
   brand: string;
   price: number;
-  previousPrice?: number;
+  previousPrice?: number | null;
   badge: string;
   rating: number;
   reviewsCount: number;
@@ -89,6 +89,20 @@ export type Cart = {
   total: number;
 };
 
+export type OrderStatus =
+  | 'Placed'
+  | 'Processing'
+  | 'Shipped'
+  | 'Completed'
+  | 'Cancelled';
+
+export type OrderItem = {
+  id: string;
+  productTitle: string;
+  unitPrice: number;
+  quantity: number;
+};
+
 export type Order = {
   id: string;
   number: string;
@@ -98,16 +112,12 @@ export type Order = {
   deliveryPoint: string;
   paymentMethod: string;
   comment: string;
-  status: string;
+  status: OrderStatus;
   total: number;
   createdAt: string;
-  items: {
-    id: string;
-    productTitle: string;
-    unitPrice: number;
-    quantity: number;
-  }[];
+  items: OrderItem[];
 };
+
 export type UserAddress = {
   id: string;
   addressType: string;
