@@ -4,4 +4,5 @@ public class AuthOptions
 {
     public const string SectionName = "Auth";
     public string? SeedAdminEmail { get; set; }
+    public string FrontendUrl { get; set; } = string.Empty;
 }

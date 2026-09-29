@@ -2,12 +2,14 @@ using Google.Apis.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using Rozetka.Api.Common;
 using Rozetka.Api.Dtos;
 using Rozetka.Api.Models;
 using Rozetka.Api.Options;
 using Rozetka.Api.Services;
+using System.Text;
 
 namespace Rozetka.Api.Controllers;
 
@@ -16,6 +18,7 @@ namespace Rozetka.Api.Controllers;
 public class AuthController(
     UserManager<User> userManager,
     JwtTokenService jwtTokenService,
+    EmailService emailService,
     IOptions<AuthOptions> authOptions,
     IOptions<GoogleAuthOptions> googleAuthOptions
 ) : ControllerBase
@@ -182,27 +185,85 @@ public class AuthController(
         user.ToDto(roles));
 }
 
-    [HttpPost("recover")]
-    public async Task<IActionResult> Recover(PasswordRecoveryRequest request)
+    [AllowAnonymous]
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword(
+    ForgotPasswordRequest request)
     {
+        if (string.IsNullOrWhiteSpace(request.Email))
+            return BadRequest("Вкажіть електронну пошту.");
+
         var email = request.Email.Trim().ToLowerInvariant();
+
         var user = await userManager.FindByEmailAsync(email);
+
         if (user is null)
+            return NoContent();
+
+        var token =
+            await userManager.GeneratePasswordResetTokenAsync(user);
+
+        var encodedToken =
+            WebEncoders.Base64UrlEncode(
+                Encoding.UTF8.GetBytes(token)
+            );
+
+        var resetUrl =
+            $"{authOptions.Value.FrontendUrl}/reset-password" +
+            $"?email={Uri.EscapeDataString(email)}" +
+            $"&token={Uri.EscapeDataString(encodedToken)}";
+
+        await emailService.SendPasswordResetEmailAsync(
+            email,
+            resetUrl
+        );
+
+        return NoContent();
+    }
+    [AllowAnonymous]
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword(
+    ResetPasswordRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email) ||
+            string.IsNullOrWhiteSpace(request.Token) ||
+            string.IsNullOrWhiteSpace(request.NewPassword))
         {
-            return NotFound("Користувача з таким email не знайдено.");
+            return BadRequest("Некоректні дані.");
         }
 
-        var removeResult = await userManager.RemovePasswordAsync(user);
-        if (!removeResult.Succeeded)
+        var email = request.Email.Trim().ToLowerInvariant();
+
+        var user = await userManager.FindByEmailAsync(email);
+
+        if (user is null)
+            return BadRequest(
+                "Посилання для відновлення пароля недійсне."
+            );
+
+        string token;
+
+        try
         {
-            return BadRequest(DescribeErrors(removeResult));
+            token = Encoding.UTF8.GetString(
+                WebEncoders.Base64UrlDecode(request.Token)
+            );
+        }
+        catch
+        {
+            return BadRequest(
+                "Посилання для відновлення пароля недійсне."
+            );
         }
 
-        var addResult = await userManager.AddPasswordAsync(user, request.NewPassword);
-        if (!addResult.Succeeded)
-        {
-            return BadRequest(DescribeErrors(addResult));
-        }
+        var result = await userManager.ResetPasswordAsync(
+            user,
+            token,
+            request.NewPassword
+        );
+
+        if (!result.Succeeded)
+            return BadRequest(DescribeErrors(result));
 
         return NoContent();
     }
