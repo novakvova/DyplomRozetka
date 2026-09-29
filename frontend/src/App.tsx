@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import {useEffect} from 'react';
 import {
     BrowserRouter,
     Navigate,
@@ -8,26 +8,30 @@ import {
     useNavigate,
 } from 'react-router-dom';
 
-import { AdminLayout } from './admin/layout/AdminLayout';
+import {AdminLayout} from './admin/layout/AdminLayout';
+import {AdminProductsPage} from './admin/pages/AdminProductsPage';
+import {AdminCategoriesPage} from './admin/pages/AdminCategoriesPage';
+import {AdminOrdersPage} from './admin/pages/AdminOrdersPage';
+import { AdminUsersPage } from './admin/pages/AdminUsersPage';
+import { AdminCreateAdminPage } from './admin/pages/AdminCreateAdminPage';
 import { AdminDashboardPage } from './admin/pages/AdminDashboardPage';
 
-import { Footer } from './components/Footer';
-import { Header } from './components/Header';
+import {Footer} from './components/Footer';
+import {Header} from './components/Header';
 
-import { AddressFormPage } from './pages/AddressFormPage';
-import { AdminPage } from './pages/AdminPage';
-import { CartPage } from './pages/CartPage';
-import { CatalogPage } from './pages/CatalogPage';
-import { CheckoutPage } from './pages/CheckoutPage';
-import { FavoritesPage } from './pages/FavoritesPage';
-import { MainPage } from './pages/MainPage';
-import { OrdersPage } from './pages/OrdersPage';
-import { PasswordChangePage } from './pages/PasswordChangePage';
-import { ProductPage } from './pages/ProductPage';
-import { ProfilePage } from './pages/ProfilePage';
-import { TwoFactorPage } from './pages/TwoFactorPage';
+import {AddressFormPage} from './pages/AddressFormPage';
+import {CartPage} from './pages/CartPage';
+import {CatalogPage} from './pages/CatalogPage';
+import {CheckoutPage} from './pages/CheckoutPage';
+import {FavoritesPage} from './pages/FavoritesPage';
+import {MainPage} from './pages/MainPage';
+import {OrdersPage} from './pages/OrdersPage';
+import {PasswordChangePage} from './pages/PasswordChangePage';
+import {ProductPage} from './pages/ProductPage';
+import {ProfilePage} from './pages/ProfilePage';
+import {TwoFactorPage} from './pages/TwoFactorPage';
 
-import { useGetMeQuery } from './store/api/authApi';
+import {useGetMeQuery} from './store/api/authApi';
 import {
     sessionExpiredHandled,
     userUpdated,
@@ -36,12 +40,12 @@ import {
     useAppDispatch,
     useAppSelector,
 } from './store/hooks';
-import { messageSet } from './store/uiSlice';
+import {messageSet} from './store/uiSlice';
 
 export function App() {
     return (
         <BrowserRouter>
-            <AppRoutes />
+            <AppRoutes/>
         </BrowserRouter>
     );
 }
@@ -66,7 +70,7 @@ function AppRoutes() {
         (state) => state.ui.message,
     );
 
-    const { data: me } = useGetMeQuery(
+    const {data: me} = useGetMeQuery(
         undefined,
         {
             skip: !token,
@@ -111,7 +115,7 @@ function AppRoutes() {
 
     return (
         <main className="min-h-screen">
-            {!isAdminRoute && <Header />}
+            {!isAdminRoute && <Header/>}
 
             {message && (
                 <p className="notice notice-toast">
@@ -120,79 +124,72 @@ function AppRoutes() {
             )}
 
             <Routes>
-                {/* =========================
-                    STORE
-                ========================= */}
 
                 <Route
                     path="/"
-                    element={<MainPage />}
+                    element={<MainPage/>}
                 />
 
                 <Route
                     path="/catalog"
-                    element={<CatalogPage />}
+                    element={<CatalogPage/>}
                 />
 
                 <Route
                     path="/product/:id"
-                    element={<ProductPage />}
+                    element={<ProductPage/>}
                 />
 
                 <Route
                     path="/favorites"
-                    element={<FavoritesPage />}
+                    element={<FavoritesPage/>}
                 />
 
                 <Route
                     path="/cart"
-                    element={<CartPage />}
+                    element={<CartPage/>}
                 />
 
                 <Route
                     path="/checkout"
-                    element={<CheckoutPage />}
+                    element={<CheckoutPage/>}
                 />
 
                 <Route
                     path="/orders"
-                    element={<OrdersPage />}
+                    element={<OrdersPage/>}
                 />
 
                 <Route
                     path="/profile"
-                    element={<ProfilePage />}
+                    element={<ProfilePage/>}
                 />
 
                 <Route
                     path="/profile/addresses/new"
-                    element={<AddressFormPage />}
+                    element={<AddressFormPage/>}
                 />
 
                 <Route
                     path="/profile/addresses"
-                    element={<ProfilePage />}
+                    element={<ProfilePage/>}
                 />
 
                 <Route
                     path="/profile/password"
-                    element={<PasswordChangePage />}
+                    element={<PasswordChangePage/>}
                 />
 
                 <Route
                     path="/profile/2fa"
-                    element={<TwoFactorPage />}
+                    element={<TwoFactorPage/>}
                 />
-
-                {/* =========================
-                    ADMIN
-                ========================= */}
 
                 <Route
                     path="/admin"
                     element={
                         user?.role === 'Admin' ? (
-                            <AdminLayout />
+                            <AdminLayout/>
                         ) : (
                             <Navigate
                                 to="/"
@@ -204,39 +201,36 @@ function AppRoutes() {
                     <Route
                         index
                         element={
-                            <AdminDashboardPage />
+                            <AdminDashboardPage/>
                         }
                     />
 
                     <Route
                         path="products"
-                        element={<AdminPage />}
+                        element={<AdminProductsPage/>}
                     />
 
                     <Route
                         path="categories"
-                        element={<AdminPage />}
+                        element={<AdminCategoriesPage/>}
                     />
 
                     <Route
                         path="orders"
-                        element={<AdminPage />}
+                        element={<AdminOrdersPage/>}
                     />
 
                     <Route
                         path="users"
-                        element={<AdminPage />}
+                        element={<AdminUsersPage />}
                     />
 
                     <Route
                         path="admins"
-                        element={<AdminPage />}
+                        element={<AdminCreateAdminPage />}
                     />
                 </Route>
 
-                {/* =========================
-                    FALLBACK
-                ========================= */}
 
                 <Route
                     path="*"
@@ -249,7 +243,7 @@ function AppRoutes() {
                 />
             </Routes>
 
-            {!isAdminRoute && <Footer />}
+            {!isAdminRoute && <Footer/>}
         </main>
     );
 }
