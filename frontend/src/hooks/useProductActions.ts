@@ -4,7 +4,7 @@ import { extractErrorMessage } from '../api/client';
 import { useAddCartItemMutation } from '../store/api/cartApi';
 import { useGetFavoritesQuery, useToggleFavoriteMutation } from '../store/api/favoritesApi';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { messageSet } from '../store/uiSlice';
+import { messageSet, cartModalOpened } from '../store/uiSlice';
 
 export function useProductActions() {
     const navigate = useNavigate();
@@ -25,7 +25,7 @@ export function useProductActions() {
 
         try {
             await addCartItem({ productId, quantity: 1 }).unwrap();
-            dispatch(messageSet('Товар додано в кошик.'));
+            dispatch(cartModalOpened());
         } catch (error) {
             dispatch(messageSet(extractErrorMessage(error, 'Не вдалося додати товар у кошик.')));
         }

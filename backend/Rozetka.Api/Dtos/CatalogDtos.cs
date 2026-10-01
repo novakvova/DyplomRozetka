@@ -20,7 +20,20 @@ public record ProductDto(
     string ManufacturerUrl,
     string Specifications,
     int StockQuantity,
+    string Condition,
+    int DeliveryDays,
     CategoryDto Category);
+
+public record FacetOptionDto(string Value, string Label, int Count);
+public record CategoryFacetDto(string Slug, string Title, int Count);
+public record CatalogFacetsDto(
+    decimal MinPrice,
+    decimal MaxPrice,
+    int TotalCount,
+    IReadOnlyList<CategoryFacetDto> Categories,
+    IReadOnlyList<FacetOptionDto> Brands,
+    IReadOnlyList<FacetOptionDto> Conditions,
+    IReadOnlyList<FacetOptionDto> Deliveries);
 
 public record ProductUpsertRequest(
     string Sku,
@@ -35,7 +48,9 @@ public record ProductUpsertRequest(
     string ManufacturerUrl,
     string Specifications,
     int StockQuantity,
-    Guid CategoryId);
+    Guid CategoryId,
+    string Condition = "new",
+    int DeliveryDays = 2);
 
 public class CategoryUpsertForm
 {

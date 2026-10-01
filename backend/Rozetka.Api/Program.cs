@@ -63,7 +63,12 @@ builder.Services.AddOpenApi(options =>
 });
 
 builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddSingleton<TotpService>();
 builder.Services.AddSingleton<ImageProcessingService>();
+builder.Services.AddMemoryCache();
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.AddSingleton<EmailService>();
+builder.Services.AddSingleton<EmailCodeService>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));

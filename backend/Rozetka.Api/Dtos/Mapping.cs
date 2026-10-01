@@ -17,7 +17,8 @@ public static class Mapping
             user.IsBlocked,
             user.BirthDate,
             user.Gender,
-            user.TwoFactorEnabled);
+            user.TwoFactorEnabled && !string.IsNullOrWhiteSpace(user.TwoFactorSecret),
+            user.AvatarUrl);
 
     public static CategoryDto ToDto(this Category category) =>
         new(category.Id, category.Slug, category.Title, category.Description, category.ImageUrl);
@@ -44,6 +45,8 @@ public static class Mapping
             product.ManufacturerUrl,
             product.Specifications,
             product.StockQuantity,
+            product.Condition,
+            product.DeliveryDays,
             product.Category!.ToDto());
 
     public static FavoriteDto ToDto(this FavoriteItem favorite) =>
@@ -74,5 +77,5 @@ public static class Mapping
             order.Status,
             order.Total,
             order.CreatedAt,
-            order.Items.Select(item => new OrderItemDto(item.Id, item.ProductTitle, item.UnitPrice, item.Quantity)).ToList());
+            order.Items.Select(item => new OrderItemDto(item.Id, item.ProductId, item.ProductTitle, item.Product?.ImageUrl ?? string.Empty, item.UnitPrice, item.Quantity)).ToList());
 }

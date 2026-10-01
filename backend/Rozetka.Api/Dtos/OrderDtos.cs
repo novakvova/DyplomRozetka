@@ -10,7 +10,7 @@ public record CheckoutRequest(
     string PaymentMethod,
     string Comment);
 
-public record OrderItemDto(Guid Id, string ProductTitle, decimal UnitPrice, int Quantity);
+public record OrderItemDto(Guid Id, Guid ProductId, string ProductTitle, string ImageUrl, decimal UnitPrice, int Quantity);
 
 public record OrderDto(
     Guid Id,

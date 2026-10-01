@@ -11,7 +11,7 @@ namespace Rozetka.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/orders")]
-public class OrdersController(AppDbContext db) 
+public class OrdersController(AppDbContext db)
     : ControllerBase
 {
     [HttpGet]
@@ -22,6 +22,7 @@ public class OrdersController(AppDbContext db)
 
         var orders = await db.Orders
             .Include(item => item.Items)
+            .ThenInclude(orderItem => orderItem.Product)
             .Where(item => item.UserId == userId)
             .OrderByDescending(item => item.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -61,6 +62,7 @@ public class OrdersController(AppDbContext db)
             Items = cart.Select(item => new OrderItem
             {
                 ProductId = item.ProductId,
+                Product = item.Product,
                 ProductTitle = item.Product!.Title,
                 UnitPrice = item.Product.Price,
                 Quantity = item.Quantity

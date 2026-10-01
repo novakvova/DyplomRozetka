@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Heart, LogOut, Package, Settings, Shield, ShoppingBag, User, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { resolveAssetUrl } from '../store/api/client';
 import { logout } from '../store/authSlice';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 
@@ -59,7 +60,11 @@ export function AccountDrawer({ open, onClose, onOpenAuth }: AccountDrawerProps)
                 {user ? (
                     <>
                         <div className="account-drawer-profile">
-                            <span className="account-drawer-avatar">{initials(user.fullName)}</span>
+                            {user.avatarUrl ? (
+                                <img className="account-drawer-avatar account-drawer-avatar-photo" src={resolveAssetUrl(user.avatarUrl)} alt={user.fullName} />
+                            ) : (
+                                <span className="account-drawer-avatar">{initials(user.fullName)}</span>
+                            )}
                             <div>
                                 <strong>{user.fullName}</strong>
                                 <span>{user.email}</span>

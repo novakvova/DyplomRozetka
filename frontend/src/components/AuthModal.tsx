@@ -1,12 +1,13 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { ChevronLeft, Eye, EyeOff, X } from 'lucide-react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
+import { Camera, ChevronLeft, Eye, EyeOff, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { extractErrorMessage } from '../store/api/client';
-import { useLoginMutation, useRegisterMutation } from '../store/api/authApi';
-import { credentialsSet } from '../store/authSlice';
+import { useLoginMutation, useLoginTwoFactorMutation, useRegisterMutation, useResendLoginCodeMutation, useUploadAvatarMutation } from '../store/api/authApi';
+import { credentialsSet, userUpdated } from '../store/authSlice';
 import { useAppDispatch } from '../store/hooks';
 import { messageSet } from '../store/uiSlice';
+import type { LoginResult } from '../types';
 
 type AuthModalProps = {
     open: boolean;
@@ -59,13 +60,22 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
     const [login, { isLoading: loginLoading }] = useLoginMutation();
+    const [loginTwoFactor, { isLoading: twoFactorLoading }] = useLoginTwoFactorMutation();
+    const [resendLoginCode, { isLoading: resendLoading }] = useResendLoginCodeMutation();
     const [register, { isLoading: registerLoading }] = useRegisterMutation();
+    const [uploadAvatar, { isLoading: avatarUploading }] = useUploadAvatarMutation();
 
     const [mode, setMode] = useState<'login' | 'register'>('register');
     const [step, setStep] = useState<RegisterStep>(1);
     const [form, setForm] = useState<RegisterForm>(EMPTY_FORM);
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+    const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+    const [avatarStepDone, setAvatarStepDone] = useState(false);
+    const [pendingLogin, setPendingLogin] = useState<{ email: string; password: string } | null>(null);
+    const [twoFactorCode, setTwoFactorCode] = useState('');
+    const [maskedEmail, setMaskedEmail] = useState<string | null>(null);
+    const [resendCooldown, setResendCooldown] = useState(0);
 
     useEffect(() => {
         if (!open) return;
@@ -85,8 +95,26 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
             setMode('register');
             setStep(1);
             setForm(EMPTY_FORM);
+            setAvatarPreview(null);
+            setAvatarStepDone(false);
+            setPendingLogin(null);
+            setTwoFactorCode('');
+            setMaskedEmail(null);
+            setResendCooldown(0);
         }
     }, [open]);
+
+    useEffect(() => {
+        return () => {
+            if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+        };
+    }, [avatarPreview]);
+
+    useEffect(() => {
+        if (resendCooldown <= 0) return;
+        const timer = window.setInterval(() => setResendCooldown((value) => Math.max(0, value - 1)), 1000);
+        return () => window.clearInterval(timer);
+    }, [resendCooldown]);
 
     if (!open) return null;
 
@@ -137,20 +165,83 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
         navigate('/catalog');
     }
 
+    async function handleAvatarSelected(event: ChangeEvent<HTMLInputElement>) {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+        setAvatarPreview(URL.createObjectURL(file));
+
+        try {
+            const nextUser = await uploadAvatar(file).unwrap();
+            dispatch(userUpdated(nextUser));
+        } catch (error) {
+            dispatch(messageSet(extractErrorMessage(error, 'Не вдалося завантажити фото.')));
+        }
+    }
+
+    function handleAvatarStepDone() {
+        setAvatarStepDone(true);
+    }
+
     async function handleLogin(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
+        const credentials = {
+            email: data.get('email') as string,
+            password: data.get('password') as string,
+        };
         try {
-            const response = await login({
-                email: data.get('email') as string,
-                password: data.get('password') as string,
-            }).unwrap();
-            dispatch(credentialsSet(response));
-            dispatch(messageSet(`Вітаємо, ${response.user.fullName}!`));
-            onClose();
+            const response = await login(credentials).unwrap();
+            if (response.requiresTwoFactor) {
+                setPendingLogin(credentials);
+                setTwoFactorCode('');
+                setMaskedEmail(response.maskedEmail ?? null);
+                setResendCooldown(30);
+                if (!response.emailSent) {
+                    dispatch(messageSet('Не вдалося надіслати код на пошту. Спробуйте ще раз.'));
+                }
+                return;
+            }
+            finishLogin(response);
         } catch (error) {
             dispatch(messageSet(extractErrorMessage(error, 'Не вдалося увійти.')));
         }
+    }
+
+    async function handleTwoFactorSubmit(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        if (!pendingLogin) return;
+        try {
+            const response = await loginTwoFactor({ ...pendingLogin, code: twoFactorCode }).unwrap();
+            finishLogin(response);
+        } catch (error) {
+            setTwoFactorCode('');
+            dispatch(messageSet(extractErrorMessage(error, 'Невірний код підтвердження.')));
+        }
+    }
+
+    async function handleResendCode() {
+        if (!pendingLogin || resendCooldown > 0) return;
+        try {
+            const response = await resendLoginCode(pendingLogin).unwrap();
+            setMaskedEmail(response.maskedEmail ?? maskedEmail);
+            setResendCooldown(30);
+            dispatch(messageSet(response.emailSent ? 'Код надіслано повторно.' : 'Не вдалося надіслати код.'));
+        } catch (error) {
+            dispatch(messageSet(extractErrorMessage(error, 'Не вдалося надіслати код.')));
+        }
+    }
+
+    function finishLogin(response: LoginResult) {
+        if (!response.token || !response.user) {
+            dispatch(messageSet('Не вдалося увійти.'));
+            return;
+        }
+        dispatch(credentialsSet({ token: response.token, user: response.user }));
+        dispatch(messageSet(`Вітаємо, ${response.user.fullName}!`));
+        setPendingLogin(null);
+        onClose();
     }
 
     function goBack() {
@@ -172,7 +263,42 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
                     </button>
                 </div>
 
-                {mode === 'login' && (
+                {mode === 'login' && pendingLogin && (
+                    <div className="auth-modal-step" key="login-2fa">
+                        <h2 className="auth-modal-title">Підтвердження входу</h2>
+                        <p className="auth-modal-subtitle">
+                            {maskedEmail
+                                ? <>Ми надіслали код на <strong>{maskedEmail}</strong>. Також підійде код із застосунку-автентифікатора, якщо він у вас підключений.</>
+                                : 'Введіть 6-значний код із застосунку-автентифікатора'}
+                        </p>
+                        <form onSubmit={handleTwoFactorSubmit} className="auth-modal-form">
+                            <input
+                                className="auth-modal-code-input"
+                                value={twoFactorCode}
+                                onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                inputMode="numeric"
+                                autoComplete="one-time-code"
+                                placeholder="000000"
+                                maxLength={6}
+                                autoFocus
+                                required
+                            />
+                            <button className="primary auth-modal-submit" disabled={twoFactorLoading || twoFactorCode.length !== 6}>
+                                {twoFactorLoading ? 'Зачекайте...' : 'Підтвердити'}
+                            </button>
+                        </form>
+                        <p className="auth-modal-switch">
+                            <button type="button" onClick={handleResendCode} disabled={resendLoading || resendCooldown > 0}>
+                                {resendCooldown > 0 ? `Надіслати ще раз (${resendCooldown} с)` : 'Надіслати код ще раз'}
+                            </button>
+                        </p>
+                        <p className="auth-modal-switch">
+                            <button type="button" onClick={() => setPendingLogin(null)}>Назад до входу</button>
+                        </p>
+                    </div>
+                )}
+
+                {mode === 'login' && !pendingLogin && (
                     <div className="auth-modal-step" key="login">
                         <h2 className="auth-modal-title">Вхід</h2>
                         <form onSubmit={handleLogin} className="auth-modal-form">
@@ -290,7 +416,29 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
                     </div>
                 )}
 
-                {mode === 'register' && step === 4 && (
+                {mode === 'register' && step === 4 && !avatarStepDone && (
+                    <div className="auth-modal-step" key="step-avatar">
+                        <h2 className="auth-modal-title">Додайте фото профілю</h2>
+                        <p className="auth-modal-subtitle">Це не обов'язково, але допоможе персоналізувати ваш акаунт</p>
+                        <div className="auth-modal-avatar-picker">
+                            <label className="auth-modal-avatar-upload" aria-label="Завантажити фото">
+                                {avatarPreview ? (
+                                    <img src={avatarPreview} alt="Попередній перегляд фото профілю" />
+                                ) : (
+                                    <Camera size={26} />
+                                )}
+                                <input type="file" accept="image/*" onChange={handleAvatarSelected} hidden />
+                            </label>
+                            {avatarUploading && <span className="auth-modal-avatar-status">Завантаження...</span>}
+                        </div>
+                        <button className="primary auth-modal-submit" type="button" onClick={handleAvatarStepDone} disabled={avatarUploading}>
+                            {avatarPreview ? 'Готово' : 'Пропустити'}
+                        </button>
+                        <Dots step={4} />
+                    </div>
+                )}
+
+                {mode === 'register' && step === 4 && avatarStepDone && (
                     <div className="auth-modal-step auth-modal-success" key="step4">
                         <div className="auth-modal-checkmark">
                             <svg viewBox="0 0 52 52">

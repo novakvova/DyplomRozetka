@@ -329,6 +329,8 @@ public class AdminController(AppDbContext db, UserManager<User> userManager, Ima
         product.ManufacturerUrl = request.ManufacturerUrl.Trim();
         product.Specifications = request.Specifications.Trim();
         product.StockQuantity = request.StockQuantity;
+        product.Condition = request.Condition == "used" ? "used" : "new";
+        product.DeliveryDays = Math.Clamp(request.DeliveryDays, 0, 30);
         product.CategoryId = request.CategoryId;
         product.Rating = product.Rating == 0 ? ValidationConstants.DefaultProductRating : product.Rating;
         product.ReviewsCount = product.ReviewsCount == 0 ? ValidationConstants.DefaultProductReviewsCount : product.ReviewsCount;
