@@ -2,12 +2,16 @@ import { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Footer } from './components/Footer';
 import { Header } from './components/Header';
+import { CartAddedModal } from './components/CartAddedModal';
+import { FavoriteAddedModal } from './components/FavoriteAddedModal';
 import { AdminPage } from './pages/AdminPage';
 import { CartPage } from './pages/CartPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { AddressFormPage } from './pages/AddressFormPage';
+import { PaymentCardFormPage } from './pages/PaymentCardFormPage';
 import { PasswordChangePage } from './pages/PasswordChangePage';
 import { TwoFactorPage } from './pages/TwoFactorPage';
+import { TwoFactorCodePage } from './pages/TwoFactorCodePage';
 import { CatalogPage } from './pages/CatalogPage';
 import { FavoritesPage } from './pages/FavoritesPage';
 import { MainPage } from './pages/MainPage';
@@ -35,7 +39,6 @@ function AppRoutes() {
     const user = useAppSelector((state) => state.auth.user);
     const token = useAppSelector((state) => state.auth.token);
     const sessionExpired = useAppSelector((state) => state.auth.sessionExpired);
-    const message = useAppSelector((state) => state.ui.message);
 
     const { data: me } = useGetMeQuery(undefined, { skip: !token });
     const location = useLocation();
@@ -59,7 +62,6 @@ function AppRoutes() {
     return (
         <main className="min-h-screen">
             <Header />
-            {message && <p className="notice notice-toast">{message}</p>}
 
             <Routes>
                 <Route path="/" element={<MainPage />} />
@@ -72,8 +74,10 @@ function AppRoutes() {
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/profile/addresses/new" element={<AddressFormPage />} />
                 <Route path="/profile/addresses" element={<ProfilePage />} />
+                <Route path="/profile/payment-cards/new" element={<PaymentCardFormPage />} />
                 <Route path="/profile/password" element={<PasswordChangePage />} />
                 <Route path="/profile/2fa" element={<TwoFactorPage />} />
+                <Route path="/2fa-code" element={<TwoFactorCodePage />} />
                 <Route
                     path="/admin"
                     element={user?.role === 'Admin' ? <AdminPage /> : <Navigate to="/" replace />}
@@ -86,6 +90,8 @@ function AppRoutes() {
             </Routes>
 
             <Footer />
+            <CartAddedModal />
+            <FavoriteAddedModal />
         </main>
     );
 }

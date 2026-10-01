@@ -63,7 +63,12 @@ builder.Services.AddOpenApi(options =>
 });
 
 builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddSingleton<TotpService>();
 builder.Services.AddSingleton<ImageProcessingService>();
+builder.Services.AddMemoryCache();
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.AddSingleton<EmailService>();
+builder.Services.AddSingleton<EmailCodeService>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -85,8 +90,6 @@ builder.Services
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
 builder.Services.Configure<GoogleAuthOptions>(builder.Configuration.GetSection(GoogleAuthOptions.SectionName));
-builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
-builder.Services.AddScoped<EmailService>();
 
 var corsOptions = builder.Configuration.GetSection(FrontendCorsOptions.SectionName).Get<FrontendCorsOptions>()
     ?? new FrontendCorsOptions();

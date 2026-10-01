@@ -17,6 +17,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
     public DbSet<UserAddress> UserAddresses => Set<UserAddress>();
+    public DbSet<PaymentCard> PaymentCards => Set<PaymentCard>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,6 +45,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(item => item.Sku).HasMaxLength(100);
             entity.Property(item => item.Title).HasMaxLength(220);
             entity.Property(item => item.Brand).HasMaxLength(100);
+            entity.Property(item => item.Condition).HasMaxLength(20);
             entity.Property(item => item.ManufacturerUrl).HasMaxLength(500);
             entity.HasOne(item => item.Category)
                 .WithMany(item => item.Products)
@@ -127,6 +129,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(item => item.Notes).HasMaxLength(400);
             entity.HasOne(item => item.User)
                 .WithMany(item => item.Addresses)
+                .HasForeignKey(item => item.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PaymentCard>(entity =>
+        {
+            entity.Property(item => item.CardholderName).HasMaxLength(160);
+            entity.Property(item => item.Brand).HasMaxLength(30);
+            entity.Property(item => item.Last4).HasMaxLength(4);
+            entity.HasOne(item => item.User)
+                .WithMany(item => item.PaymentCards)
                 .HasForeignKey(item => item.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });

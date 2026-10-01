@@ -19,11 +19,25 @@ export type User = {
   birthDate?: string | null;
   gender?: string | null;
   twoFactorEnabled: boolean;
+  avatarUrl?: string | null;
 };
 
 export type AuthResponse = {
   token: string;
   user: User;
+};
+
+export type LoginResult = {
+  requiresTwoFactor: boolean;
+  token?: string | null;
+  user?: User | null;
+  emailSent: boolean;
+  maskedEmail?: string | null;
+};
+
+export type TwoFactorSetup = {
+  secret: string;
+  otpAuthUri: string;
 };
 
 export type Category = {
@@ -60,7 +74,31 @@ export type Product = {
   manufacturerUrl: string;
   specifications: string;
   stockQuantity: number;
+  condition: 'new' | 'used';
+  deliveryDays: number;
   category: Category;
+};
+
+export type FacetOption = {
+  value: string;
+  label: string;
+  count: number;
+};
+
+export type CategoryFacet = {
+  slug: string;
+  title: string;
+  count: number;
+};
+
+export type CatalogFacets = {
+  minPrice: number;
+  maxPrice: number;
+  totalCount: number;
+  categories: CategoryFacet[];
+  brands: FacetOption[];
+  conditions: FacetOption[];
+  deliveries: FacetOption[];
 };
 
 export type Favorite = {
@@ -103,7 +141,9 @@ export type Order = {
   createdAt: string;
   items: {
     id: string;
+    productId: string;
     productTitle: string;
+    imageUrl: string;
     unitPrice: number;
     quantity: number;
   }[];
@@ -124,3 +164,22 @@ export type UserAddress = {
 };
 
 export type UserAddressRequest = Omit<UserAddress, 'id'>;
+
+export type PaymentCard = {
+  id: string;
+  cardholderName: string;
+  brand: string;
+  last4: string;
+  expiryMonth: number;
+  expiryYear: number;
+  isDefault: boolean;
+};
+
+export type PaymentCardRequest = {
+  cardholderName: string;
+  cardNumber: string;
+  expiryMonth: number;
+  expiryYear: number;
+  cvv: string;
+  isDefault: boolean;
+};

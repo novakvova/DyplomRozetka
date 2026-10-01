@@ -1,82 +1,166 @@
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, Headphones, RefreshCcw, ShieldCheck, Truck } from 'lucide-react';
-import { ProductGrid } from '../components/ProductGrid';
+import { Heart, ShoppingBag, ShoppingCart, X } from 'lucide-react';
+import { AuthModal } from '../components/AuthModal';
+import { ProfileSidebar } from '../components/ProfileSidebar';
+import { SelectField } from '../components/SelectField';
+import { formatPrice, resolveAssetUrl } from '../store/api/client';
 import { useProductActions } from '../hooks/useProductActions';
 import { useAppSelector } from '../store/hooks';
 
-const GUARANTEES = [
-    { icon: Truck, title: 'Безкоштовна доставка', note: 'при замовленні від 1 000 грн' },
-    { icon: RefreshCcw, title: 'Повернення товару', note: 'протягом 14 днів' },
-    { icon: ShieldCheck, title: 'Гарантія якості', note: 'тільки оригінальні товари' },
-    { icon: Headphones, title: 'Підтримка 24/7', note: 'ми завжди на зв\u2019язку' },
+type SortKey = 'added' | 'price-asc' | 'price-desc' | 'title';
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+    { key: 'added', label: 'За додаванням' },
+    { key: 'price-asc', label: 'Спочатку дешевші' },
+    { key: 'price-desc', label: 'Спочатку дорожчі' },
+    { key: 'title', label: 'За назвою (А-Я)' },
 ];
 
-function Guarantees() {
-    return (
-        <div className="cart-guarantees">
-            {GUARANTEES.map(({ icon: Icon, title, note }) => (
-                <div className="cart-guarantee" key={title}>
-                    <Icon size={20} strokeWidth={1.8} />
-                    <div>
-                        <strong>{title}</strong>
-                        <span>{note}</span>
-                    </div>
-                </div>
-            ))}
-        </div>
-    );
+function pluralizeGoods(count: number) {
+    const mod10 = count % 10;
+    const mod100 = count % 100;
+    if (mod10 === 1 && mod100 !== 11) return 'товар';
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'товари';
+    return 'товарів';
 }
 
 export function FavoritesPage() {
     const navigate = useNavigate();
     const user = useAppSelector((state) => state.auth.user);
-    const { favorites, favoriteProductIds, addToCart, toggleFavorite } = useProductActions();
+    const [authOpen, setAuthOpen] = useState(false);
+    const [sortKey, setSortKey] = useState<SortKey>('added');
+    const { favorites, addToCart, toggleFavorite } = useProductActions();
+
+    const sortedFavorites = useMemo(() => {
+        const list = [...favorites];
+        if (sortKey === 'price-asc') return list.sort((a, b) => a.product.price - b.product.price);
+        if (sortKey === 'price-desc') return list.sort((a, b) => b.product.price - a.product.price);
+        if (sortKey === 'title') return list.sort((a, b) => a.product.title.localeCompare(b.product.title, 'uk'));
+        return list;
+    }, [favorites, sortKey]);
 
     if (!user) {
         return (
-            <section className="cart-page cart-empty-page">
-                <div className="cart-empty-art" aria-hidden="true">
-                    <Heart size={64} strokeWidth={1.3} />
-                </div>
-                <h1>Увійдіть, щоб бачити обране</h1>
-                <p>Ваші збережені товари зберігаються в акаунті Lumio.</p>
-                <button type="button" className="primary cart-empty-cta" onClick={() => navigate('/profile')}>
-                    Увійти в акаунт
+            <section className="profile-page profile-guest">
+                <h1>Увійдіть в акаунт Lumio</h1>
+                <p>Щоб бачити свій список бажань, увійдіть у свій акаунт.</p>
+                <button type="button" className="primary" onClick={() => setAuthOpen(true)}>
+                    Увійти або зареєструватися
                 </button>
+                <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
             </section>
         );
     }
 
-    if (favorites.length === 0) {
-        return (
-            <section className="cart-page cart-empty-page">
-                <div className="cart-empty-art" aria-hidden="true">
-                    <Heart size={64} strokeWidth={1.3} />
-                </div>
-                <h1>Список бажань порожній</h1>
-                <p>Додавайте товари в обране, щоб не загубити їх</p>
-                <button type="button" className="primary cart-empty-cta" onClick={() => navigate('/catalog')}>
-                    Перейти до каталогу
-                </button>
-                <Guarantees />
-            </section>
-        );
-    }
+    const count = favorites.length;
+    const activeSortLabel = SORT_OPTIONS.find((option) => option.key === sortKey)?.label ?? SORT_OPTIONS[0].label;
 
     return (
-        <section className="cart-page">
-            <h1 className="cart-title">Обране</h1>
-            <p className="favorites-count">{favorites.length} товарів у списку бажань</p>
+        <section className="profile-page">
+            <div className="profile-layout">
+                <ProfileSidebar />
 
-            <ProductGrid
-                products={favorites.map((item) => item.product)}
-                favoriteProductIds={favoriteProductIds}
-                onOpen={(product) => navigate(`/product/${product.id}`)}
-                onAddToCart={addToCart}
-                onToggleFavorite={toggleFavorite}
-            />
+                <div className="profile-content">
+                    <div className="account-panel">
+                        <div className="account-panel-head">
+                            <h1>Вибране</h1>
+                        </div>
 
-            <Guarantees />
+                        <div className="favorites-toolbar">
+                            <p className="favorites-summary">{count} {pluralizeGoods(count)} у списку бажань</p>
+
+                            {count > 0 && (
+                                <div className="favorites-sort">
+                                    <span>Сортування:</span>
+                                    <SelectField
+                                        value={activeSortLabel}
+                                        onChange={(label) => {
+                                            const found = SORT_OPTIONS.find((option) => option.label === label);
+                                            if (found) setSortKey(found.key);
+                                        }}
+                                        options={SORT_OPTIONS.map((option) => option.label)}
+                                        placeholder="Сортування"
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        {count === 0 ? (
+                            <div className="favorites-empty">
+                                <div className="favorites-empty-art" aria-hidden="true">
+                                    <span className="favorites-empty-spark favorites-empty-spark-1">✦</span>
+                                    <span className="favorites-empty-spark favorites-empty-spark-2">✦</span>
+                                    <div className="favorites-empty-circle">
+                                        <ShoppingBag size={32} strokeWidth={1.6} />
+                                        <span className="favorites-empty-heart">
+                          <Heart size={12} fill="currentColor" strokeWidth={0} />
+                        </span>
+                                    </div>
+                                </div>
+
+                                <strong>У вас ще немає товарів у вибраному</strong>
+                                <p>Додайте товари до вибраного, щоб швидко повертатися до них</p>
+                                <button type="button" className="primary" onClick={() => navigate('/catalog')}>
+                                    Перейти до каталогу
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="favorites-list">
+                                {sortedFavorites.map((favorite, index) => {
+                                    const product = favorite.product;
+                                    const outOfStock = product.stockQuantity <= 0;
+
+                                    return (
+                                        <article
+                                            className="favorites-item"
+                                            key={favorite.id}
+                                            style={{ animationDelay: `${Math.min(index, 8) * 0.04}s` }}
+                                        >
+                                            <button
+                                                type="button"
+                                                className="favorites-item-media"
+                                                onClick={() => navigate(`/product/${product.id}`)}
+                                                aria-label={product.title}
+                                            >
+                                                <img src={resolveAssetUrl(product.imageUrl)} alt={product.title} loading="lazy" />
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                className="favorites-item-title"
+                                                onClick={() => navigate(`/product/${product.id}`)}
+                                            >
+                                                {product.title}
+                                            </button>
+
+                                            <strong className="favorites-item-price">{formatPrice(product.price)}</strong>
+
+                                            <button
+                                                type="button"
+                                                className="primary favorites-item-add"
+                                                onClick={() => addToCart(product.id)}
+                                                disabled={outOfStock}
+                                            >
+                                                <ShoppingCart size={14} /> {outOfStock ? 'немає в наявності' : 'додати в кошик'}
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                className="cart-item-remove favorites-item-remove"
+                                                onClick={() => toggleFavorite(product.id)}
+                                                aria-label="Видалити з обраного"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </article>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
         </section>
     );
 }

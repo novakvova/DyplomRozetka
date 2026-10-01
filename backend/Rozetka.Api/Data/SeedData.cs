@@ -16,6 +16,7 @@ public static class SeedData
         await EnsureCategoryImageUrlColumnAsync(db);
         await EnsureCartFavoritesReviewsOrdersTablesAsync(db);
         await EnsureUserAddressesTableAsync(db);
+        await EnsurePaymentCardsTableAsync(db);
         await EnsureUserProfileColumnsAsync(db);
 
         await EnsureRoleAsync(roleManager, Roles.Admin);
@@ -284,6 +285,10 @@ public static class SeedData
             ADD COLUMN IF NOT EXISTS "BirthDate" date NULL;
             ALTER TABLE "AspNetUsers"
             ADD COLUMN IF NOT EXISTS "Gender" varchar(20) NULL;
+            ALTER TABLE "AspNetUsers"
+            ADD COLUMN IF NOT EXISTS "AvatarUrl" text NULL;
+            ALTER TABLE "AspNetUsers"
+            ADD COLUMN IF NOT EXISTS "TwoFactorSecret" text NULL;
             """);
     }
 
@@ -308,6 +313,25 @@ public static class SeedData
                 CONSTRAINT "FK_UserAddresses_AspNetUsers_UserId" FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE
             );
             CREATE INDEX IF NOT EXISTS "IX_UserAddresses_UserId" ON "UserAddresses" ("UserId");
+            """);
+    }
+
+    private static async Task EnsurePaymentCardsTableAsync(AppDbContext db)
+    {
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS "PaymentCards" (
+                "Id" uuid NOT NULL PRIMARY KEY,
+                "UserId" uuid NOT NULL,
+                "CardholderName" varchar(160) NOT NULL DEFAULT '',
+                "Brand" varchar(30) NOT NULL DEFAULT '',
+                "Last4" varchar(4) NOT NULL DEFAULT '',
+                "ExpiryMonth" integer NOT NULL DEFAULT 0,
+                "ExpiryYear" integer NOT NULL DEFAULT 0,
+                "IsDefault" boolean NOT NULL DEFAULT FALSE,
+                "CreatedAt" timestamp with time zone NOT NULL DEFAULT NOW(),
+                CONSTRAINT "FK_PaymentCards_AspNetUsers_UserId" FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS "IX_PaymentCards_UserId" ON "PaymentCards" ("UserId");
             """);
     }
 

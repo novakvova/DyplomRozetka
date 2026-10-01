@@ -5,89 +5,60 @@ using Rozetka.Api.Options;
 
 namespace Rozetka.Api.Services;
 
-public class EmailService(
-    IOptions<EmailOptions> options)
+public class EmailService(IOptions<EmailOptions> options, ILogger<EmailService> logger)
 {
-    private readonly EmailOptions _options = options.Value;
-
-    public async Task SendPasswordResetEmailAsync(
-        string email,
-        string resetUrl)
+    public async Task<bool> SendAsync(string to, string subject, string htmlBody, CancellationToken cancellationToken = default)
     {
-        using var client = new SmtpClient(
-            _options.Host,
-            _options.Port)
+        var settings = options.Value;
+        if (!settings.IsConfigured)
         {
-            EnableSsl = true,
-            Credentials = new NetworkCredential(
-                _options.UserName,
-                _options.Password
-            )
-        };
+            logger.LogWarning("Email is not configured (section 'Email' in appsettings). Message to {Recipient} was not sent.", to);
+            return false;
+        }
 
-        using var message = new MailMessage
+        try
         {
-            From = new MailAddress(
-                _options.FromEmail,
-                _options.FromName
-            ),
+            using var message = new MailMessage
+            {
+                From = new MailAddress(settings.FromEmail, settings.FromName),
+                Subject = subject,
+                Body = htmlBody,
+                IsBodyHtml = true
+            };
+            message.To.Add(to);
 
-            Subject = "Відновлення пароля Lumio",
+            using var client = new SmtpClient(settings.Host, settings.Port)
+            {
+                EnableSsl = settings.EnableSsl,
+                DeliveryMethod = SmtpDeliveryMethod.Network
+            };
 
-            Body = $"""
-                <div style="
-                    font-family: Arial, sans-serif;
-                    max-width: 520px;
-                    margin: 0 auto;
-                    padding: 32px;
-                ">
-                    <h1 style="text-align:center;">
-                        Lumio
-                    </h1>
+            if (!string.IsNullOrWhiteSpace(settings.UserName))
+            {
+                client.Credentials = new NetworkCredential(settings.UserName, settings.Password.Replace(" ", string.Empty));
+            }
 
-                    <h2>
-                        Відновлення пароля
-                    </h2>
+            await client.SendMailAsync(message, cancellationToken);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Failed to send email to {Recipient}.", to);
+            return false;
+        }
+    }
 
-                    <p>
-                        Ми отримали запит на зміну пароля
-                        вашого облікового запису Lumio.
-                    </p>
-
-                    <p>
-                        Натисніть кнопку нижче, щоб
-                        встановити новий пароль.
-                    </p>
-
-                    <p style="margin: 30px 0;">
-                        <a
-                            href="{resetUrl}"
-                            style="
-                                display:inline-block;
-                                background:#f43f25;
-                                color:white;
-                                padding:14px 24px;
-                                border-radius:8px;
-                                text-decoration:none;
-                                font-weight:bold;
-                            "
-                        >
-                            Відновити пароль
-                        </a>
-                    </p>
-
-                    <p style="color:#777;">
-                        Якщо ви не надсилали цей запит,
-                        просто проігноруйте лист.
-                    </p>
-                </div>
-                """,
-
-            IsBodyHtml = true
-        };
-
-        message.To.Add(email);
-
-        await client.SendMailAsync(message);
+    public Task<bool> SendPasswordResetEmailAsync(string to, string resetUrl, CancellationToken cancellationToken = default)
+    {
+        var safeUrl = WebUtility.HtmlEncode(resetUrl);
+        var body = $"""
+            <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;">
+              <h2>Відновлення пароля — Lumio</h2>
+              <p>Ви отримали цей лист, бо було надіслано запит на відновлення пароля.</p>
+              <p><a href="{safeUrl}" style="display:inline-block;padding:12px 20px;background:#6c3df4;color:#fff;border-radius:8px;text-decoration:none;">Встановити новий пароль</a></p>
+              <p style="color:#777;font-size:13px;">Якщо ви не надсилали цей запит, просто проігноруйте лист.</p>
+            </div>
+            """;
+        return SendAsync(to, "Відновлення пароля — Lumio", body, cancellationToken);
     }
 }

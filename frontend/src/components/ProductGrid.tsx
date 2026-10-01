@@ -8,11 +8,12 @@ type ProductGridProps = {
   onOpen: (product: Product) => void;
   onAddToCart: (productId: string) => void;
   onToggleFavorite: (productId: string) => void;
+  variant?: 'default' | 'catalog';
 };
 
-export function ProductGrid({ products, favoriteProductIds, onOpen, onAddToCart, onToggleFavorite }: ProductGridProps) {
+export function ProductGrid({ products, favoriteProductIds, onOpen, onAddToCart, onToggleFavorite, variant = 'default' }: ProductGridProps) {
   return (
-      <div className="grid">
+      <div className={variant === 'catalog' ? 'grid grid-catalog' : 'grid'}>
         {products.map((product, index) => {
           const isFavorite = favoriteProductIds.has(product.id);
           const hasDiscount = !!product.previousPrice && product.previousPrice > product.price;
