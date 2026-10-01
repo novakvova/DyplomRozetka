@@ -15,7 +15,7 @@ namespace Rozetka.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public class AuthController(UserManager<User> userManager, JwtTokenService jwtTokenService, IOptions<AuthOptions> authOptions, ImageProcessingService imageProcessingService, TotpService totpService, EmailCodeService emailCodeService) : ControllerBase
+public class AuthController(UserManager<User> userManager, JwtTokenService jwtTokenService, IOptions<AuthOptions> authOptions, ImageProcessingService imageProcessingService, TotpService totpService, EmailCodeService emailCodeService, IOptions<GoogleAuthOptions> googleAuthOptions, EmailService emailService) : ControllerBase
 {
     [HttpPost("register")]
     public async Task<ActionResult<AuthResponse>> Register(RegisterRequest request)
@@ -144,110 +144,110 @@ public class AuthController(UserManager<User> userManager, JwtTokenService jwtTo
 
     [HttpPost("google")]
     public async Task<ActionResult<AuthResponse>> Google(GoogleLoginRequest request)
-{
-    if (string.IsNullOrWhiteSpace(request.Credential))
     {
-        return BadRequest("Google credential не передано.");
-    }
+        if (string.IsNullOrWhiteSpace(request.Credential))
+        {
+            return BadRequest("Google credential не передано.");
+        }
 
-    GoogleJsonWebSignature.Payload payload;
+        GoogleJsonWebSignature.Payload payload;
 
-    try
-    {
-        payload = await GoogleJsonWebSignature.ValidateAsync(
-            request.Credential,
-            new GoogleJsonWebSignature.ValidationSettings
-            {
-                Audience = new[]
+        try
+        {
+            payload = await GoogleJsonWebSignature.ValidateAsync(
+                request.Credential,
+                new GoogleJsonWebSignature.ValidationSettings
                 {
+                    Audience = new[]
+                    {
                     googleAuthOptions.Value.ClientId
-                }
-            });
-    }
-    catch (InvalidJwtException)
-    {
-        return Unauthorized("Не вдалося підтвердити Google-вхід.");
-    }
-
-    if (string.IsNullOrWhiteSpace(payload.Email) ||
-        !payload.EmailVerified)
-    {
-        return Unauthorized("Google email не підтверджено.");
-    }
-
-    var email = payload.Email.Trim().ToLowerInvariant();
-
-    var user = await userManager.FindByLoginAsync(
-        "Google",
-        payload.Subject);
-
-    if (user is null)
-    {
-        user = await userManager.FindByEmailAsync(email);
-    }
-
-    if (user is null)
-    {
-        user = new User
+                    }
+                });
+        }
+        catch (InvalidJwtException)
         {
-            UserName = email,
-            Email = email,
-            FullName = string.IsNullOrWhiteSpace(payload.Name)
-                ? "Google користувач"
-                : payload.Name.Trim(),
-            PhoneNumber = string.Empty,
-            City = string.Empty
-        };
-
-        var createResult = await userManager.CreateAsync(user);
-
-        if (!createResult.Succeeded)
-        {
-            return BadRequest(DescribeErrors(createResult));
+            return Unauthorized("Не вдалося підтвердити Google-вхід.");
         }
 
-        var roleResult = await userManager.AddToRoleAsync(
-            user,
-            Roles.User);
-
-        if (!roleResult.Succeeded)
+        if (string.IsNullOrWhiteSpace(payload.Email) ||
+            !payload.EmailVerified)
         {
-            return BadRequest(DescribeErrors(roleResult));
+            return Unauthorized("Google email не підтверджено.");
         }
-    }
 
-    if (user.IsBlocked)
-    {
-        return Forbid(ErrorMessages.UserBlocked);
-    }
+        var email = payload.Email.Trim().ToLowerInvariant();
 
-    var logins = await userManager.GetLoginsAsync(user);
+        var user = await userManager.FindByLoginAsync(
+            "Google",
+            payload.Subject);
 
-    var hasGoogleLogin = logins.Any(login =>
-        login.LoginProvider == "Google" &&
-        login.ProviderKey == payload.Subject);
-
-    if (!hasGoogleLogin)
-    {
-        var loginResult = await userManager.AddLoginAsync(
-            user,
-            new UserLoginInfo(
-                "Google",
-                payload.Subject,
-                "Google"));
-
-        if (!loginResult.Succeeded)
+        if (user is null)
         {
-            return BadRequest(DescribeErrors(loginResult));
+            user = await userManager.FindByEmailAsync(email);
         }
+
+        if (user is null)
+        {
+            user = new User
+            {
+                UserName = email,
+                Email = email,
+                FullName = string.IsNullOrWhiteSpace(payload.Name)
+                    ? "Google користувач"
+                    : payload.Name.Trim(),
+                PhoneNumber = string.Empty,
+                City = string.Empty
+            };
+
+            var createResult = await userManager.CreateAsync(user);
+
+            if (!createResult.Succeeded)
+            {
+                return BadRequest(DescribeErrors(createResult));
+            }
+
+            var roleResult = await userManager.AddToRoleAsync(
+                user,
+                Roles.User);
+
+            if (!roleResult.Succeeded)
+            {
+                return BadRequest(DescribeErrors(roleResult));
+            }
+        }
+
+        if (user.IsBlocked)
+        {
+            return Forbid(ErrorMessages.UserBlocked);
+        }
+
+        var logins = await userManager.GetLoginsAsync(user);
+
+        var hasGoogleLogin = logins.Any(login =>
+            login.LoginProvider == "Google" &&
+            login.ProviderKey == payload.Subject);
+
+        if (!hasGoogleLogin)
+        {
+            var loginResult = await userManager.AddLoginAsync(
+                user,
+                new UserLoginInfo(
+                    "Google",
+                    payload.Subject,
+                    "Google"));
+
+            if (!loginResult.Succeeded)
+            {
+                return BadRequest(DescribeErrors(loginResult));
+            }
+        }
+
+        var roles = await userManager.GetRolesAsync(user);
+
+        return new AuthResponse(
+            jwtTokenService.CreateToken(user, roles),
+            user.ToDto(roles));
     }
-
-    var roles = await userManager.GetRolesAsync(user);
-
-    return new AuthResponse(
-        jwtTokenService.CreateToken(user, roles),
-        user.ToDto(roles));
-}
 
     [AllowAnonymous]
     [HttpPost("forgot-password")]

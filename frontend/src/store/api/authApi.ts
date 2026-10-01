@@ -53,6 +53,12 @@ export const authApi = apiSlice.injectEndpoints({
         googleLogin: builder.mutation<AuthResponse, GoogleLoginRequest>({
             query: (body) => ({url: '/auth/google', method: 'POST', body}),
         }),
+        forgotPassword: builder.mutation<void, { email: string }>({
+            query: (body) => ({url: '/auth/forgot-password', method: 'POST', body}),
+        }),
+        resetPassword: builder.mutation<void, { email: string; token: string; newPassword: string }>({
+            query: (body) => ({url: '/auth/reset-password', method: 'POST', body}),
+        }),
         updateProfile: builder.mutation<User, ProfileUpdateRequest>({
             query: (body) => ({url: '/auth/profile', method: 'PUT', body}),
             invalidatesTags: ['Auth'],
@@ -77,7 +83,7 @@ export const authApi = apiSlice.injectEndpoints({
                 form.append('File', file);
                 return { url: '/auth/avatar', method: 'POST', body: form };
             },
-            https://github.com/novakvova/DyplomRozetka/pull/23/conflict?name=backend%252FRozetka.Api%252FDtos%252FAuthDtos.cs&ancestor_oid=7f8520753d6f7e81f8f126f7ca76127e1ce6497f&base_oid=1dad86f8665b2a41aa1c2a0be79762dc40830eed&head_oid=993d2e02a2fe961a9e7d7ba3839ccbd9d13341c1invalidatesTags: ['Auth'],
+            invalidatesTags: ['Auth'],
         }),
         deleteAvatar: builder.mutation<User, void>({
             query: () => ({ url: '/auth/avatar', method: 'DELETE' }),
@@ -95,6 +101,8 @@ export const {
     useEnableTwoFactorMutation,
     useRegisterMutation,
     useGoogleLoginMutation,
+    useForgotPasswordMutation,
+    useResetPasswordMutation,
     useUpdateProfileMutation,
     useChangePasswordMutation,
     useSetTwoFactorMutation,

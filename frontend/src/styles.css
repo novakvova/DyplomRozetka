@@ -5977,3 +5977,68 @@ form,
     grid-template-columns: 1fr 1fr;
   }
 }
+
+.auth-login-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 24px 0 16px;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+
+.auth-login-divider::before,
+.auth-login-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.auth-login-socials {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.auth-login-google {
+  display: flex;
+  justify-content: center;
+  max-width: 100%;
+  min-height: 44px;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.auth-login-register {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  text-align: center;
+  font-size: 15px;
+}
+
+.auth-login-register strong {
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.auth-login-register button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--brand);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.auth-login-register button:hover {
+  border: none;
+  background: transparent;
+  color: var(--brand-dark);
+  text-decoration: underline;
+}

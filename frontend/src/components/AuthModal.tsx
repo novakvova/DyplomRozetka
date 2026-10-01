@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 
 import { extractErrorMessage } from '../store/api/client';
-import { useLoginMutation, useLoginTwoFactorMutation, useRegisterMutation, useResendLoginCodeMutation, useUploadAvatarMutation } from '../store/api/authApi';
+import { useGoogleLoginMutation, useLoginMutation, useLoginTwoFactorMutation, useRegisterMutation, useResendLoginCodeMutation, useUploadAvatarMutation } from '../store/api/authApi';
 import { credentialsSet, userUpdated } from '../store/authSlice';
 import { useAppDispatch } from '../store/hooks';
 import { messageSet } from '../store/uiSlice';
@@ -72,6 +72,7 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
     const dispatch = useAppDispatch();
 
     const [login, { isLoading: loginLoading }] = useLoginMutation();
+    const [googleLogin] = useGoogleLoginMutation();
     const [loginTwoFactor, { isLoading: twoFactorLoading }] = useLoginTwoFactorMutation();
     const [resendLoginCode, { isLoading: resendLoading }] = useResendLoginCodeMutation();
     const [register, { isLoading: registerLoading }] = useRegisterMutation();
@@ -262,6 +263,15 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
         }
     }
 
+    async function handleGoogleLogin(credential: string) {
+        try {
+            const response = await googleLogin({ credential }).unwrap();
+            finishLogin({ requiresTwoFactor: false, emailSent: false, token: response.token, user: response.user });
+        } catch (error) {
+            dispatch(messageSet(extractErrorMessage(error, 'Не вдалося увійти через Google.')));
+        }
+    }
+
     async function handleTwoFactorSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         if (!pendingLogin) return;
@@ -401,36 +411,36 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
                         {/* SOCIAL LOGIN */}
 
                         <div className="auth-login-socials auth-login-socials-single">
-    <div className="auth-login-google">
-        <GoogleLogin
-            onSuccess={(credentialResponse) => {
-                if (!credentialResponse.credential) {
-                    dispatch(
-                        messageSet(
-                            'Google не повернув дані авторизації.'
-                        )
-                    );
-                    return;
-                }
+                            <div className="auth-login-google">
+                                <GoogleLogin
+                                    onSuccess={(credentialResponse) => {
+                                        if (!credentialResponse.credential) {
+                                            dispatch(
+                                                messageSet(
+                                                    'Google не повернув дані авторизації.'
+                                                )
+                                            );
+                                            return;
+                                        }
 
-                void handleGoogleLogin(
-                    credentialResponse.credential
-                );
-            }}
-            onError={() => {
-                dispatch(
-                    messageSet(
-                        'Не вдалося увійти через Google.'
-                    )
-                );
-            }}
-            text="signin_with"
-            shape="rectangular"
-            size="large"
-            width="342"
-        />
-    </div>
-</div>
+                                        void handleGoogleLogin(
+                                            credentialResponse.credential
+                                        );
+                                    }}
+                                    onError={() => {
+                                        dispatch(
+                                            messageSet(
+                                                'Не вдалося увійти через Google.'
+                                            )
+                                        );
+                                    }}
+                                    text="signin_with"
+                                    shape="rectangular"
+                                    size="large"
+                                    width="342"
+                                />
+                            </div>
+                        </div>
 
                         {/* REGISTER LINK */}
 

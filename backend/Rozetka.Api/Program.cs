@@ -90,8 +90,6 @@ builder.Services
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
 builder.Services.Configure<GoogleAuthOptions>(builder.Configuration.GetSection(GoogleAuthOptions.SectionName));
-builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
-builder.Services.AddScoped<EmailService>();
 
 var corsOptions = builder.Configuration.GetSection(FrontendCorsOptions.SectionName).Get<FrontendCorsOptions>()
     ?? new FrontendCorsOptions();

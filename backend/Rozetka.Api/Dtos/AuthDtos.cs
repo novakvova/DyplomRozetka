@@ -16,7 +16,7 @@ public record TwoFactorEnableRequest(string Code);
 public record TwoFactorLoginRequest(string Email, string Password, string Code);
 public record TwoFactorSetupResponse(string Secret, string OtpAuthUri);
 public record ProfileUpdateRequest(string FullName, string Phone, string Email, string City, DateOnly? BirthDate, string? Gender);
-public record GoogleLoginRequest(string Email, string FullName, string GoogleToken);
+public record GoogleLoginRequest(string Credential);
 
 public record UserDto(Guid Id, string Email, string FullName, string Phone, string City, string Role, bool IsBlocked, DateOnly? BirthDate, string? Gender, bool TwoFactorEnabled, string? AvatarUrl);
 public record AuthResponse(string Token, UserDto User);

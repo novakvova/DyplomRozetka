@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { CreditCard } from 'lucide-react';
 import { extractErrorMessage } from '../store/api/client';
 import { ProfileSidebar } from '../components/ProfileSidebar';
@@ -25,6 +25,16 @@ function detectBrand(digits: string): 'Visa' | 'Mastercard' | '' {
 
 export function PaymentCardFormPage() {
     const navigate = useNavigate();
+    const location = useLocation();
+    const returnState = location.state as { returnTo?: string; checkoutDraft?: unknown } | null;
+    const returnTo = returnState?.returnTo;
+    const goBack = () => {
+        if (returnTo) {
+            navigate(returnTo, { state: { checkoutDraft: returnState?.checkoutDraft } });
+        } else {
+            navigate('/profile');
+        }
+    };
     const dispatch = useAppDispatch();
     const user = useAppSelector((state) => state.auth.user);
     const [createPaymentCard, { isLoading }] = useCreatePaymentCardMutation();
@@ -78,7 +88,7 @@ export function PaymentCardFormPage() {
                 isDefault,
             }).unwrap();
             dispatch(messageSet('Картку збережено.'));
-            navigate('/profile');
+            goBack();
         } catch (error) {
             setFormError(extractErrorMessage(error, 'Не вдалося зберегти картку.'));
         }
@@ -90,7 +100,7 @@ export function PaymentCardFormPage() {
                 <ProfileSidebar />
 
                 <div className="profile-content">
-                    <h1 className="address-form-title">Додати картку</h1>
+                    <h1 className="address-form-title">{returnTo ? 'Дані картки' : 'Додати картку'}</h1>
                     <p className="address-form-subtitle">
                         Дані картки шифруються і використовуються лише для оплати замовлень
                     </p>
@@ -158,7 +168,7 @@ export function PaymentCardFormPage() {
                         {formError && <p className="form-error-banner">{formError}</p>}
 
                         <div className="address-form-actions">
-                            <button type="button" onClick={() => navigate('/profile')}>Скасувати</button>
+                            <button type="button" onClick={goBack}>Скасувати</button>
                             <button type="submit" className="primary" disabled={isLoading}>
                                 {isLoading ? 'Збереження...' : 'Зберегти картку'}
                             </button>
