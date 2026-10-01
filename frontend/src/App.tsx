@@ -22,6 +22,8 @@ import { useGetMeQuery } from './store/api/authApi';
 import { sessionExpiredHandled, userUpdated } from './store/authSlice';
 import { useAppDispatch, useAppSelector } from './store/hooks';
 import { messageSet } from './store/uiSlice';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 
 export function App() {
     return (
@@ -80,7 +82,11 @@ function AppRoutes() {
                     path="/admin"
                     element={user?.role === 'Admin' ? <AdminPage /> : <Navigate to="/" replace />}
                 />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />}/>
+                <Route path="/reset-password" element={<ResetPasswordPage />}/>
                 <Route path="*" element={<Navigate to="/" replace />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />}/>
+                <Route path="/reset-password" element={<ResetPasswordPage />}/>
             </Routes>
 
             <Footer />

@@ -1,12 +1,15 @@
+using Google.Apis.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using Rozetka.Api.Common;
 using Rozetka.Api.Dtos;
 using Rozetka.Api.Models;
 using Rozetka.Api.Options;
 using Rozetka.Api.Services;
+using System.Text;
 
 namespace Rozetka.Api.Controllers;
 
@@ -141,64 +144,190 @@ public class AuthController(UserManager<User> userManager, JwtTokenService jwtTo
 
     [HttpPost("google")]
     public async Task<ActionResult<AuthResponse>> Google(GoogleLoginRequest request)
+{
+    if (string.IsNullOrWhiteSpace(request.Credential))
     {
-        var email = request.Email.Trim().ToLowerInvariant();
-        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(request.GoogleToken))
-        {
-            return BadRequest("Не вдалося підтвердити Google-вхід.");
-        }
-
-        var user = await userManager.FindByEmailAsync(email);
-        if (user is null)
-        {
-            user = new User
-            {
-                UserName = email,
-                Email = email,
-                FullName = string.IsNullOrWhiteSpace(request.FullName) ? "Google користувач" : request.FullName.Trim(),
-                PhoneNumber = "",
-                City = ""
-            };
-
-            var createResult = await userManager.CreateAsync(user, Guid.NewGuid().ToString("N"));
-            if (!createResult.Succeeded)
-            {
-                return BadRequest(DescribeErrors(createResult));
-            }
-
-            await userManager.AddToRoleAsync(user, Roles.User);
-        }
-
-        if (user.IsBlocked)
-        {
-            return Forbid(ErrorMessages.UserBlocked);
-        }
-
-        var roles = await userManager.GetRolesAsync(user);
-        return new AuthResponse(jwtTokenService.CreateToken(user, roles), user.ToDto(roles));
+        return BadRequest("Google credential не передано.");
     }
 
-    [HttpPost("recover")]
-    public async Task<IActionResult> Recover(PasswordRecoveryRequest request)
+    GoogleJsonWebSignature.Payload payload;
+
+    try
     {
+        payload = await GoogleJsonWebSignature.ValidateAsync(
+            request.Credential,
+            new GoogleJsonWebSignature.ValidationSettings
+            {
+                Audience = new[]
+                {
+                    googleAuthOptions.Value.ClientId
+                }
+            });
+    }
+    catch (InvalidJwtException)
+    {
+        return Unauthorized("Не вдалося підтвердити Google-вхід.");
+    }
+
+    if (string.IsNullOrWhiteSpace(payload.Email) ||
+        !payload.EmailVerified)
+    {
+        return Unauthorized("Google email не підтверджено.");
+    }
+
+    var email = payload.Email.Trim().ToLowerInvariant();
+
+    var user = await userManager.FindByLoginAsync(
+        "Google",
+        payload.Subject);
+
+    if (user is null)
+    {
+        user = await userManager.FindByEmailAsync(email);
+    }
+
+    if (user is null)
+    {
+        user = new User
+        {
+            UserName = email,
+            Email = email,
+            FullName = string.IsNullOrWhiteSpace(payload.Name)
+                ? "Google користувач"
+                : payload.Name.Trim(),
+            PhoneNumber = string.Empty,
+            City = string.Empty
+        };
+
+        var createResult = await userManager.CreateAsync(user);
+
+        if (!createResult.Succeeded)
+        {
+            return BadRequest(DescribeErrors(createResult));
+        }
+
+        var roleResult = await userManager.AddToRoleAsync(
+            user,
+            Roles.User);
+
+        if (!roleResult.Succeeded)
+        {
+            return BadRequest(DescribeErrors(roleResult));
+        }
+    }
+
+    if (user.IsBlocked)
+    {
+        return Forbid(ErrorMessages.UserBlocked);
+    }
+
+    var logins = await userManager.GetLoginsAsync(user);
+
+    var hasGoogleLogin = logins.Any(login =>
+        login.LoginProvider == "Google" &&
+        login.ProviderKey == payload.Subject);
+
+    if (!hasGoogleLogin)
+    {
+        var loginResult = await userManager.AddLoginAsync(
+            user,
+            new UserLoginInfo(
+                "Google",
+                payload.Subject,
+                "Google"));
+
+        if (!loginResult.Succeeded)
+        {
+            return BadRequest(DescribeErrors(loginResult));
+        }
+    }
+
+    var roles = await userManager.GetRolesAsync(user);
+
+    return new AuthResponse(
+        jwtTokenService.CreateToken(user, roles),
+        user.ToDto(roles));
+}
+
+    [AllowAnonymous]
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword(
+    ForgotPasswordRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email))
+            return BadRequest("Вкажіть електронну пошту.");
+
         var email = request.Email.Trim().ToLowerInvariant();
+
         var user = await userManager.FindByEmailAsync(email);
+
         if (user is null)
+            return NoContent();
+
+        var token =
+            await userManager.GeneratePasswordResetTokenAsync(user);
+
+        var encodedToken =
+            WebEncoders.Base64UrlEncode(
+                Encoding.UTF8.GetBytes(token)
+            );
+
+        var resetUrl =
+            $"{authOptions.Value.FrontendUrl}/reset-password" +
+            $"?email={Uri.EscapeDataString(email)}" +
+            $"&token={Uri.EscapeDataString(encodedToken)}";
+
+        await emailService.SendPasswordResetEmailAsync(
+            email,
+            resetUrl
+        );
+
+        return NoContent();
+    }
+    [AllowAnonymous]
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword(
+    ResetPasswordRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email) ||
+            string.IsNullOrWhiteSpace(request.Token) ||
+            string.IsNullOrWhiteSpace(request.NewPassword))
         {
-            return NotFound("Користувача з таким email не знайдено.");
+            return BadRequest("Некоректні дані.");
         }
 
-        var removeResult = await userManager.RemovePasswordAsync(user);
-        if (!removeResult.Succeeded)
+        var email = request.Email.Trim().ToLowerInvariant();
+
+        var user = await userManager.FindByEmailAsync(email);
+
+        if (user is null)
+            return BadRequest(
+                "Посилання для відновлення пароля недійсне."
+            );
+
+        string token;
+
+        try
         {
-            return BadRequest(DescribeErrors(removeResult));
+            token = Encoding.UTF8.GetString(
+                WebEncoders.Base64UrlDecode(request.Token)
+            );
+        }
+        catch
+        {
+            return BadRequest(
+                "Посилання для відновлення пароля недійсне."
+            );
         }
 
-        var addResult = await userManager.AddPasswordAsync(user, request.NewPassword);
-        if (!addResult.Succeeded)
-        {
-            return BadRequest(DescribeErrors(addResult));
-        }
+        var result = await userManager.ResetPasswordAsync(
+            user,
+            token,
+            request.NewPassword
+        );
+
+        if (!result.Succeeded)
+            return BadRequest(DescribeErrors(result));
 
         return NoContent();
     }

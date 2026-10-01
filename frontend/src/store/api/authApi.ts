@@ -14,15 +14,8 @@ type RegisterRequest = LoginRequest & {
     gender?: string | null;
 };
 
-type RecoverRequest = {
-    email: string;
-    newPassword: string;
-};
-
 type GoogleLoginRequest = {
-    email: string;
-    fullName: string;
-    googleToken: string;
+    credential: string;
 };
 
 type ProfileUpdateRequest = {
@@ -55,23 +48,20 @@ export const authApi = apiSlice.injectEndpoints({
             query: (body) => ({ url: '/auth/login/two-factor/resend', method: 'POST', body }),
         }),
         register: builder.mutation<AuthResponse, RegisterRequest>({
-            query: (body) => ({ url: '/auth/register', method: 'POST', body }),
-        }),
-        recoverPassword: builder.mutation<void, RecoverRequest>({
-            query: (body) => ({ url: '/auth/recover', method: 'POST', body }),
+            query: (body) => ({url: '/auth/register', method: 'POST', body}),
         }),
         googleLogin: builder.mutation<AuthResponse, GoogleLoginRequest>({
-            query: (body) => ({ url: '/auth/google', method: 'POST', body }),
+            query: (body) => ({url: '/auth/google', method: 'POST', body}),
         }),
         updateProfile: builder.mutation<User, ProfileUpdateRequest>({
-            query: (body) => ({ url: '/auth/profile', method: 'PUT', body }),
+            query: (body) => ({url: '/auth/profile', method: 'PUT', body}),
             invalidatesTags: ['Auth'],
         }),
         changePassword: builder.mutation<void, PasswordChangeRequest>({
-            query: (body) => ({ url: '/auth/password', method: 'PUT', body }),
+            query: (body) => ({url: '/auth/password', method: 'PUT', body}),
         }),
         setTwoFactor: builder.mutation<User, { enabled: boolean; password?: string }>({
-            query: (body) => ({ url: '/auth/two-factor', method: 'PUT', body }),
+            query: (body) => ({url: '/auth/two-factor', method: 'PUT', body}),
             invalidatesTags: ['Auth'],
         }),
         setupTwoFactor: builder.mutation<TwoFactorSetup, void>({
@@ -87,7 +77,7 @@ export const authApi = apiSlice.injectEndpoints({
                 form.append('File', file);
                 return { url: '/auth/avatar', method: 'POST', body: form };
             },
-            invalidatesTags: ['Auth'],
+            https://github.com/novakvova/DyplomRozetka/pull/23/conflict?name=backend%252FRozetka.Api%252FDtos%252FAuthDtos.cs&ancestor_oid=7f8520753d6f7e81f8f126f7ca76127e1ce6497f&base_oid=1dad86f8665b2a41aa1c2a0be79762dc40830eed&head_oid=993d2e02a2fe961a9e7d7ba3839ccbd9d13341c1invalidatesTags: ['Auth'],
         }),
         deleteAvatar: builder.mutation<User, void>({
             query: () => ({ url: '/auth/avatar', method: 'DELETE' }),
@@ -104,7 +94,6 @@ export const {
     useSetupTwoFactorMutation,
     useEnableTwoFactorMutation,
     useRegisterMutation,
-    useRecoverPasswordMutation,
     useGoogleLoginMutation,
     useUpdateProfileMutation,
     useChangePasswordMutation,
