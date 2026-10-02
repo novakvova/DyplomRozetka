@@ -30,6 +30,32 @@ public class OrdersController(AppDbContext db)
         return orders.Select(item => item.ToDto()).ToList();
     }
 
+    [HttpPost("{id:guid}/cancel")]
+    public async Task<IActionResult> Cancel
+        (Guid id, CancellationToken cancellationToken)
+    {
+        var userId = CurrentUser.GetUserId(User);
+
+        var order = await db.Orders
+            .Include(item => item.Items)
+            .SingleOrDefaultAsync(item => item.Id == id && item.UserId == userId, cancellationToken);
+
+        if (order is null)
+        {
+            return NotFound("Замовлення не знайдено.");
+        }
+
+        if (order.Status is not (OrderStatus.Placed or OrderStatus.Processing))
+        {
+            return BadRequest("Це замовлення вже не можна скасувати.");
+        }
+
+        db.Orders.Remove(order);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
     [HttpPost("checkout")]
     public async Task<ActionResult<OrderDto>> Checkout
         (CheckoutRequest request, CancellationToken cancellationToken)

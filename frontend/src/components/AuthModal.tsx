@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 
 import { extractErrorMessage } from '../store/api/client';
+import { apiSlice } from '../store/apiSlice';
 import { useGoogleLoginMutation, useLoginMutation, useLoginTwoFactorMutation, useRegisterMutation, useResendLoginCodeMutation, useUploadAvatarMutation } from '../store/api/authApi';
 import { credentialsSet, userUpdated } from '../store/authSlice';
 import { useAppDispatch } from '../store/hooks';
@@ -266,7 +267,7 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
     async function handleGoogleLogin(credential: string) {
         try {
             const response = await googleLogin({ credential }).unwrap();
-            finishLogin({ requiresTwoFactor: false, emailSent: false, token: response.token, user: response.user });
+            finishLogin({ requiresTwoFactor: false, emailSent: false, user: response.user });
         } catch (error) {
             dispatch(messageSet(extractErrorMessage(error, 'Не вдалося увійти через Google.')));
         }
@@ -297,11 +298,12 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
     }
 
     function finishLogin(response: LoginResult) {
-        if (!response.token || !response.user) {
+        if (!response.user) {
             dispatch(messageSet('Не вдалося увійти.'));
             return;
         }
-        dispatch(credentialsSet({ token: response.token, user: response.user }));
+        dispatch(credentialsSet({ user: response.user }));
+        dispatch(apiSlice.util.invalidateTags(['Reviews']));
         dispatch(messageSet(`Вітаємо, ${response.user.fullName}!`));
         setPendingLogin(null);
         onClose();
@@ -415,24 +417,13 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
                                 <GoogleLogin
                                     onSuccess={(credentialResponse) => {
                                         if (!credentialResponse.credential) {
-                                            dispatch(
-                                                messageSet(
-                                                    'Google не повернув дані авторизації.'
-                                                )
-                                            );
+                                            dispatch(messageSet('Google не повернув дані авторизації.'));
                                             return;
                                         }
-
-                                        void handleGoogleLogin(
-                                            credentialResponse.credential
-                                        );
+                                        void handleGoogleLogin(credentialResponse.credential);
                                     }}
                                     onError={() => {
-                                        dispatch(
-                                            messageSet(
-                                                'Не вдалося увійти через Google.'
-                                            )
-                                        );
+                                        dispatch(messageSet('Не вдалося увійти через Google.'));
                                     }}
                                     text="signin_with"
                                     shape="rectangular"

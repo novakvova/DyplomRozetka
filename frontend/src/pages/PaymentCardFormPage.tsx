@@ -1,10 +1,10 @@
-import { useMemo, useState, type FormEvent } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { CreditCard } from 'lucide-react';
 import { extractErrorMessage } from '../store/api/client';
 import { ProfileSidebar } from '../components/ProfileSidebar';
 import { SelectField } from '../components/SelectField';
-import { useCreatePaymentCardMutation } from '../store/api/paymentCardsApi';
+import { useCreatePaymentCardMutation, useGetPaymentCardsQuery, useUpdatePaymentCardMutation } from '../store/api/paymentCardsApi';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { messageSet } from '../store/uiSlice';
 
@@ -37,7 +37,13 @@ export function PaymentCardFormPage() {
     };
     const dispatch = useAppDispatch();
     const user = useAppSelector((state) => state.auth.user);
-    const [createPaymentCard, { isLoading }] = useCreatePaymentCardMutation();
+    const { id: editId } = useParams<{ id: string }>();
+    const isEdit = Boolean(editId);
+    const { data: cards = [], isLoading: cardsLoading } = useGetPaymentCardsQuery(undefined, { skip: !user });
+    const editingCard = isEdit ? cards.find((card) => card.id === editId) : undefined;
+    const [createPaymentCard, { isLoading: creating }] = useCreatePaymentCardMutation();
+    const [updatePaymentCard, { isLoading: updating }] = useUpdatePaymentCardMutation();
+    const isLoading = creating || updating;
 
     const [cardholderName, setCardholderName] = useState(user?.fullName ?? '');
     const [cardNumber, setCardNumber] = useState('');
@@ -46,6 +52,14 @@ export function PaymentCardFormPage() {
     const [cvv, setCvv] = useState('');
     const [isDefault, setIsDefault] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!editingCard) return;
+        setCardholderName(editingCard.cardholderName);
+        setExpiryMonth(String(editingCard.expiryMonth).padStart(2, '0'));
+        setExpiryYear(String(editingCard.expiryYear));
+        setIsDefault(editingCard.isDefault);
+    }, [editingCard?.id]);
 
     const digits = cardNumber.replace(/\D/g, '');
     const brand = useMemo(() => detectBrand(digits), [digits]);
@@ -59,9 +73,46 @@ export function PaymentCardFormPage() {
         );
     }
 
+    if (isEdit && !cardsLoading && !editingCard) {
+        return (
+            <section className="profile-page profile-guest">
+                <h1>Картку не знайдено</h1>
+                <button type="button" className="primary" onClick={() => navigate('/profile')}>До профілю</button>
+            </section>
+        );
+    }
+
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         setFormError(null);
+
+        if (isEdit && editId) {
+            if (digits.length > 0 && digits.length < 13) {
+                setFormError('Введіть повний номер картки або залиште поле порожнім.');
+                return;
+            }
+
+            if (!expiryMonth || !expiryYear) {
+                setFormError('Оберіть місяць і рік дії картки.');
+                return;
+            }
+
+            try {
+                await updatePaymentCard({
+                    id: editId,
+                    cardholderName,
+                    cardNumber: digits || null,
+                    expiryMonth: Number(expiryMonth),
+                    expiryYear: Number(expiryYear),
+                    isDefault,
+                }).unwrap();
+                dispatch(messageSet('Дані картки оновлено.'));
+                goBack();
+            } catch (error) {
+                setFormError(extractErrorMessage(error, 'Не вдалося оновити картку.'));
+            }
+            return;
+        }
 
         if (digits.length < 13) {
             setFormError('Введіть повний номер картки.');
@@ -100,7 +151,7 @@ export function PaymentCardFormPage() {
                 <ProfileSidebar />
 
                 <div className="profile-content">
-                    <h1 className="address-form-title">{returnTo ? 'Дані картки' : 'Додати картку'}</h1>
+                    <h1 className="address-form-title">{isEdit ? 'Редагувати картку' : returnTo ? 'Дані картки' : 'Додати картку'}</h1>
                     <p className="address-form-subtitle">
                         Дані картки шифруються і використовуються лише для оплати замовлень
                     </p>
@@ -124,11 +175,11 @@ export function PaymentCardFormPage() {
                                     <input
                                         value={formatCardNumber(cardNumber)}
                                         onChange={(event) => setCardNumber(event.target.value)}
-                                        placeholder="0000 0000 0000 0000"
+                                        placeholder={isEdit && editingCard ? `•••• •••• •••• ${editingCard.last4}` : '0000 0000 0000 0000'}
                                         inputMode="numeric"
                                         autoComplete="cc-number"
                                         maxLength={23}
-                                        required
+                                        required={!isEdit}
                                     />
                                     {brand && <span className="payment-card-brand-badge">{brand}</span>}
                                     {!brand && <CreditCard size={18} className="payment-card-generic-icon" />}
@@ -145,23 +196,25 @@ export function PaymentCardFormPage() {
                                 <SelectField value={expiryYear} onChange={setExpiryYear} options={YEARS} placeholder="РРРР" />
                             </label>
 
-                            <label className="address-field">
-                                CVV
-                                <input
-                                    value={cvv}
-                                    onChange={(event) => setCvv(event.target.value.replace(/\D/g, '').slice(0, 4))}
-                                    placeholder="•••"
-                                    inputMode="numeric"
-                                    autoComplete="cc-csc"
-                                    type="password"
-                                    maxLength={4}
-                                    required
-                                />
-                            </label>
+                            {!isEdit && (
+                                <label className="address-field">
+                                    CVV
+                                    <input
+                                        value={cvv}
+                                        onChange={(event) => setCvv(event.target.value.replace(/\D/g, '').slice(0, 4))}
+                                        placeholder="•••"
+                                        inputMode="numeric"
+                                        autoComplete="cc-csc"
+                                        type="password"
+                                        maxLength={4}
+                                        required
+                                    />
+                                </label>
+                            )}
                         </div>
 
                         <label className="address-default-check">
-                            <input type="checkbox" checked={isDefault} onChange={(event) => setIsDefault(event.target.checked)} />
+                            <input type="checkbox" checked={isDefault} disabled={Boolean(editingCard?.isDefault)} onChange={(event) => setIsDefault(event.target.checked)} />
                             Зробити цю картку основною
                         </label>
 
@@ -170,7 +223,7 @@ export function PaymentCardFormPage() {
                         <div className="address-form-actions">
                             <button type="button" onClick={goBack}>Скасувати</button>
                             <button type="submit" className="primary" disabled={isLoading}>
-                                {isLoading ? 'Збереження...' : 'Зберегти картку'}
+                                {isLoading ? 'Збереження...' : isEdit ? 'Зберегти зміни' : 'Зберегти картку'}
                             </button>
                         </div>
                     </form>

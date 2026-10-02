@@ -52,8 +52,23 @@ public static class Mapping
     public static FavoriteDto ToDto(this FavoriteItem favorite) =>
         new(favorite.Id, favorite.Product!.ToDto(), favorite.CreatedAt);
 
-    public static ReviewDto ToDto(this Review review) =>
-        new(review.Id, review.ProductId, review.User?.FullName ?? "Користувач Rozetka", review.Rating, review.Text, review.CreatedAt);
+    public static ReviewDto ToDto(this Review review, Guid? currentUserId = null)
+    {
+        var myReaction = currentUserId is null
+            ? null
+            : review.Reactions.FirstOrDefault(item => item.UserId == currentUserId)?.IsLike;
+
+        return new ReviewDto(
+            review.Id,
+            review.ProductId,
+            review.User?.FullName ?? "Користувач Rozetka",
+            review.Rating,
+            review.Text,
+            review.CreatedAt,
+            review.Reactions.Count(item => item.IsLike),
+            review.Reactions.Count(item => !item.IsLike),
+            myReaction is null ? null : (myReaction.Value ? "like" : "dislike"));
+    }
 
     public static CartDto ToCartDto(this IEnumerable<CartItem> items)
     {

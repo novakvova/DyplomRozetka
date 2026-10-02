@@ -11,15 +11,17 @@ import {
     Phone,
     RefreshCcw,
     RotateCcw,
+    XCircle,
     ShoppingBag,
     Truck,
     User as UserIcon,
 } from 'lucide-react';
 import { extractErrorMessage, formatPrice, resolveAssetUrl } from '../store/api/client';
 import { AuthModal } from '../components/AuthModal';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { ProfileSidebar } from '../components/ProfileSidebar';
 import { useAddCartItemMutation } from '../store/api/cartApi';
-import { useGetOrdersQuery } from '../store/api/ordersApi';
+import { useCancelOrderMutation, useGetOrdersQuery } from '../store/api/ordersApi';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { messageSet } from '../store/uiSlice';
 import type { Order } from '../types';
@@ -59,7 +61,10 @@ export function OrdersPage() {
     const [authOpen, setAuthOpen] = useState(false);
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
     const [reorderingId, setReorderingId] = useState<string | null>(null);
+    const [cancellingId, setCancellingId] = useState<string | null>(null);
+    const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
     const [addCartItem] = useAddCartItemMutation();
+    const [cancelOrder] = useCancelOrderMutation();
 
     const { data: orders = [], isFetching } = useGetOrdersQuery(undefined, { skip: !user });
 
@@ -96,6 +101,20 @@ export function OrdersPage() {
             dispatch(messageSet(extractErrorMessage(error, 'Не вдалося повторити замовлення.')));
         } finally {
             setReorderingId(null);
+        }
+    }
+
+    async function handleCancel() {
+        if (!orderToCancel) return;
+        setCancellingId(orderToCancel.id);
+        try {
+            await cancelOrder(orderToCancel.id).unwrap();
+            dispatch(messageSet('Замовлення скасовано.'));
+            setOrderToCancel(null);
+        } catch (error) {
+            dispatch(messageSet(extractErrorMessage(error, 'Не вдалося скасувати замовлення.')));
+        } finally {
+            setCancellingId(null);
         }
     }
 
@@ -273,6 +292,15 @@ export function OrdersPage() {
                                                 </div>
 
                                                 <div className="order-actions">
+                                                    {(order.status === 'Placed' || order.status === 'Processing') && (
+                                                        <button
+                                                            type="button"
+                                                            className="order-cancel"
+                                                            onClick={() => setOrderToCancel(order)}
+                                                        >
+                                                            <XCircle size={16} /> Скасувати замовлення
+                                                        </button>
+                                                    )}
                                                     <button
                                                         type="button"
                                                         className="primary order-reorder"
@@ -291,6 +319,18 @@ export function OrdersPage() {
                     </div>
                 </div>
             </div>
+
+            <ConfirmModal
+                open={orderToCancel !== null}
+                title="Скасувати замовлення?"
+                text={orderToCancel ? `Замовлення №${orderToCancel.number} буде скасовано. Цю дію не можна буде відмінити.` : ''}
+                icon={<XCircle size={34} strokeWidth={1.6} />}
+                confirmLabel="Так, скасувати"
+                cancelLabel="Залишити замовлення"
+                loading={cancellingId !== null}
+                onConfirm={handleCancel}
+                onClose={() => setOrderToCancel(null)}
+            />
         </section>
     );
 }

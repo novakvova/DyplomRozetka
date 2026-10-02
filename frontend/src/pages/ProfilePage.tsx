@@ -1,6 +1,6 @@
 import { FormEvent, useRef, useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, CreditCard, Home, Briefcase, KeyRound, MapPin, Plus, ShieldCheck, Smartphone, Trash2 } from 'lucide-react';
+import { Camera, CreditCard, Home, Briefcase, KeyRound, MapPin, Pencil, Plus, ShieldCheck, Smartphone, Trash2 } from 'lucide-react';
 import { extractErrorMessage, resolveAssetUrl } from '../store/api/client';
 import { AuthModal } from '../components/AuthModal';
 import { ProfileSidebar } from '../components/ProfileSidebar';
@@ -351,6 +351,14 @@ export function ProfilePage() {
                               Зробити основною
                             </button>
                         )}
+                        <button
+                            type="button"
+                            className="profile-address-edit"
+                            onClick={() => navigate(`/profile/payment-cards/${card.id}/edit`)}
+                            aria-label="Редагувати картку"
+                        >
+                          <Pencil size={15} />
+                        </button>
                         <button
                             type="button"
                             className="profile-address-delete"

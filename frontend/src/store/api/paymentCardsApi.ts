@@ -1,6 +1,15 @@
 import { apiSlice } from '../apiSlice';
 import type { PaymentCard, PaymentCardRequest } from '../../types';
 
+export type PaymentCardUpdateRequest = {
+    id: string;
+    cardholderName: string;
+    cardNumber: string | null;
+    expiryMonth: number;
+    expiryYear: number;
+    isDefault: boolean;
+};
+
 export const paymentCardsApi = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
         getPaymentCards: builder.query<PaymentCard[], void>({
@@ -9,6 +18,10 @@ export const paymentCardsApi = apiSlice.injectEndpoints({
         }),
         createPaymentCard: builder.mutation<PaymentCard, PaymentCardRequest>({
             query: (body) => ({ url: '/payment-cards', method: 'POST', body }),
+            invalidatesTags: ['PaymentCards'],
+        }),
+        updatePaymentCard: builder.mutation<PaymentCard, PaymentCardUpdateRequest>({
+            query: ({ id, ...body }) => ({ url: `/payment-cards/${id}`, method: 'PUT', body }),
             invalidatesTags: ['PaymentCards'],
         }),
         setDefaultPaymentCard: builder.mutation<PaymentCard, string>({
@@ -25,6 +38,7 @@ export const paymentCardsApi = apiSlice.injectEndpoints({
 export const {
     useGetPaymentCardsQuery,
     useCreatePaymentCardMutation,
+    useUpdatePaymentCardMutation,
     useSetDefaultPaymentCardMutation,
     useDeletePaymentCardMutation,
 } = paymentCardsApi;

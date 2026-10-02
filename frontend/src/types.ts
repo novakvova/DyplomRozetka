@@ -114,6 +114,9 @@ export type Review = {
   rating: number;
   text: string;
   createdAt: string;
+  likesCount: number;
+  dislikesCount: number;
+  myReaction: 'like' | 'dislike' | null;
 };
 
 export type CartItem = {

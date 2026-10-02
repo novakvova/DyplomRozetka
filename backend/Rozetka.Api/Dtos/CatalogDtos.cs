@@ -60,5 +60,6 @@ public class CategoryUpsertForm
     public IFormFile? Image { get; set; }
 }
 public record FavoriteDto(Guid Id, ProductDto Product, DateTime CreatedAt);
-public record ReviewDto(Guid Id, Guid ProductId, string UserFullName, int Rating, string Text, DateTime CreatedAt);
+public record ReviewDto(Guid Id, Guid ProductId, string UserFullName, int Rating, string Text, DateTime CreatedAt, int LikesCount = 0, int DislikesCount = 0, string? MyReaction = null);
 public record ReviewCreateRequest(Guid ProductId, int Rating, string Text);
+public record ReviewReactionRequest(string Reaction);

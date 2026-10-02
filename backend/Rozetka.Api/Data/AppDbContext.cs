@@ -15,6 +15,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<ReviewReaction> ReviewReactions => Set<ReviewReaction>();
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
     public DbSet<UserAddress> UserAddresses => Set<UserAddress>();
     public DbSet<PaymentCard> PaymentCards => Set<PaymentCard>();
@@ -89,6 +90,19 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasOne(item => item.Product)
                 .WithMany(item => item.Reviews)
                 .HasForeignKey(item => item.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ReviewReaction>(entity =>
+        {
+            entity.HasIndex(item => new { item.ReviewId, item.UserId }).IsUnique();
+            entity.HasOne(item => item.Review)
+                .WithMany(item => item.Reactions)
+                .HasForeignKey(item => item.ReviewId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.User)
+                .WithMany()
+                .HasForeignKey(item => item.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
