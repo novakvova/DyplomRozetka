@@ -38,6 +38,9 @@ export const authApi = apiSlice.injectEndpoints({
             query: () => '/auth/me',
             providesTags: ['Auth'],
         }),
+        logout: builder.mutation<void, void>({
+            query: () => ({ url: '/auth/logout', method: 'POST' }),
+        }),
         login: builder.mutation<LoginResult, LoginRequest>({
             query: (body) => ({ url: '/auth/login', method: 'POST', body }),
         }),
@@ -101,6 +104,7 @@ export const {
     useEnableTwoFactorMutation,
     useRegisterMutation,
     useGoogleLoginMutation,
+    useLogoutMutation,
     useForgotPasswordMutation,
     useResetPasswordMutation,
     useUpdateProfileMutation,

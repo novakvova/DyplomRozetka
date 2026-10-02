@@ -99,7 +99,8 @@ builder.Services.AddCors(options =>
     options.AddPolicy(FrontendCorsOptions.PolicyName, policy =>
         policy.WithOrigins(corsOptions.AllowedOrigins)
             .AllowAnyHeader()
-            .AllowAnyMethod());
+            .AllowAnyMethod()
+            .AllowCredentials());
 });
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
@@ -112,6 +113,19 @@ builder.Services
     {
         options.RequireHttpsMetadata = false;
         options.SaveToken = true;
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                if (string.IsNullOrEmpty(context.Token)
+                    && context.Request.Cookies.TryGetValue(AuthCookie.Name, out var cookieToken))
+                {
+                    context.Token = cookieToken;
+                }
+
+                return Task.CompletedTask;
+            }
+        };
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = false,

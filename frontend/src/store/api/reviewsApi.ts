@@ -7,6 +7,12 @@ type CreateReviewRequest = {
     text: string;
 };
 
+type ReviewReactionRequest = {
+    reviewId: string;
+    productId: string;
+    reaction: 'like' | 'dislike';
+};
+
 export const reviewsApi = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
         getProductReviews: builder.query<Review[], string>({
@@ -17,7 +23,11 @@ export const reviewsApi = apiSlice.injectEndpoints({
             query: (body) => ({ url: '/reviews', method: 'POST', body }),
             invalidatesTags: (_result, _error, arg) => [{ type: 'Reviews', id: arg.productId }, 'Products'],
         }),
+        reactToReview: builder.mutation<Review, ReviewReactionRequest>({
+            query: ({ reviewId, reaction }) => ({ url: `/reviews/${reviewId}/reaction`, method: 'PUT', body: { reaction } }),
+            invalidatesTags: (_result, _error, arg) => [{ type: 'Reviews', id: arg.productId }],
+        }),
     }),
 });
 
-export const { useGetProductReviewsQuery, useCreateReviewMutation } = reviewsApi;
+export const { useGetProductReviewsQuery, useCreateReviewMutation, useReactToReviewMutation } = reviewsApi;

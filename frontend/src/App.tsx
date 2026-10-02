@@ -18,6 +18,7 @@ import { MainPage } from './pages/MainPage';
 import { OrdersPage } from './pages/OrdersPage';
 import { ProductPage } from './pages/ProductPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { apiSlice } from './store/apiSlice';
 import { useGetMeQuery } from './store/api/authApi';
 import { sessionExpiredHandled, userUpdated } from './store/authSlice';
 import { useAppDispatch, useAppSelector } from './store/hooks';
@@ -37,10 +38,9 @@ function AppRoutes() {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
     const user = useAppSelector((state) => state.auth.user);
-    const token = useAppSelector((state) => state.auth.token);
     const sessionExpired = useAppSelector((state) => state.auth.sessionExpired);
 
-    const { data: me } = useGetMeQuery(undefined, { skip: !token });
+    const { data: me } = useGetMeQuery(undefined, { skip: !user });
     const location = useLocation();
 
     useEffect(() => {
@@ -49,6 +49,7 @@ function AppRoutes() {
 
     useEffect(() => {
         if (sessionExpired) {
+            dispatch(apiSlice.util.resetApiState());
             dispatch(messageSet('Сесія застаріла. Увійдіть ще раз.'));
             navigate('/profile');
             dispatch(sessionExpiredHandled());
@@ -75,6 +76,7 @@ function AppRoutes() {
                 <Route path="/profile/addresses/new" element={<AddressFormPage />} />
                 <Route path="/profile/addresses" element={<ProfilePage />} />
                 <Route path="/profile/payment-cards/new" element={<PaymentCardFormPage />} />
+                <Route path="/profile/payment-cards/:id/edit" element={<PaymentCardFormPage />} />
                 <Route path="/profile/password" element={<PasswordChangePage />} />
                 <Route path="/profile/2fa" element={<TwoFactorPage />} />
                 <Route path="/2fa-code" element={<TwoFactorCodePage />} />

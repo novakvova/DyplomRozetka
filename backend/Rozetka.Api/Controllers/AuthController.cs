@@ -17,6 +17,20 @@ namespace Rozetka.Api.Controllers;
 [Route("api/auth")]
 public class AuthController(UserManager<User> userManager, JwtTokenService jwtTokenService, IOptions<AuthOptions> authOptions, ImageProcessingService imageProcessingService, TotpService totpService, EmailCodeService emailCodeService, IOptions<GoogleAuthOptions> googleAuthOptions, EmailService emailService) : ControllerBase
 {
+    private string IssueAuthCookie(User user, IEnumerable<string> roles)
+    {
+        AuthCookie.Append(HttpContext, jwtTokenService.CreateToken(user, roles));
+        return string.Empty;
+    }
+
+    [AllowAnonymous]
+    [HttpPost("logout")]
+    public IActionResult Logout()
+    {
+        AuthCookie.Delete(HttpContext);
+        return NoContent();
+    }
+
     [HttpPost("register")]
     public async Task<ActionResult<AuthResponse>> Register(RegisterRequest request)
     {
@@ -49,7 +63,7 @@ public class AuthController(UserManager<User> userManager, JwtTokenService jwtTo
 
         var roles = await userManager.GetRolesAsync(user);
 
-        return new AuthResponse(jwtTokenService.CreateToken(user, roles), user.ToDto(roles));
+        return new AuthResponse(IssueAuthCookie(user, roles), user.ToDto(roles));
     }
 
     [HttpPost("login")]
@@ -75,7 +89,7 @@ public class AuthController(UserManager<User> userManager, JwtTokenService jwtTo
         }
 
         var roles = await userManager.GetRolesAsync(user);
-        return new LoginResult(false, jwtTokenService.CreateToken(user, roles), user.ToDto(roles));
+        return new LoginResult(false, IssueAuthCookie(user, roles), user.ToDto(roles));
     }
 
     [HttpPost("login/two-factor/resend")]
@@ -139,7 +153,7 @@ public class AuthController(UserManager<User> userManager, JwtTokenService jwtTo
         emailCodeService.Clear(user.Id);
 
         var roles = await userManager.GetRolesAsync(user);
-        return new LoginResult(false, jwtTokenService.CreateToken(user, roles), user.ToDto(roles));
+        return new LoginResult(false, IssueAuthCookie(user, roles), user.ToDto(roles));
     }
 
     [HttpPost("google")]
@@ -245,7 +259,7 @@ public class AuthController(UserManager<User> userManager, JwtTokenService jwtTo
         var roles = await userManager.GetRolesAsync(user);
 
         return new AuthResponse(
-            jwtTokenService.CreateToken(user, roles),
+            IssueAuthCookie(user, roles),
             user.ToDto(roles));
     }
 

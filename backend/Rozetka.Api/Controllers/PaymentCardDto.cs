@@ -26,6 +26,13 @@ public record PaymentCardRequest(
     string Cvv,
     bool IsDefault);
 
+public record PaymentCardUpdateRequest(
+    string CardholderName,
+    string? CardNumber,
+    int ExpiryMonth,
+    int ExpiryYear,
+    bool IsDefault);
+
 [ApiController]
 [Route("api/payment-cards")]
 [Authorize]
@@ -103,6 +110,65 @@ public class PaymentCardsController(AppDbContext db) : ControllerBase
         }
 
         db.PaymentCards.Add(card);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return ToDto(card);
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<PaymentCardDto>> Update(Guid id, PaymentCardUpdateRequest request, CancellationToken cancellationToken)
+    {
+        var userId = CurrentUser.GetUserId(User);
+
+        var card = await db.PaymentCards
+            .SingleOrDefaultAsync(item => item.Id == id && item.UserId == userId, cancellationToken);
+
+        if (card is null)
+        {
+            return NotFound("Картку не знайдено.");
+        }
+
+        var cardholderName = request.CardholderName.Trim();
+
+        if (cardholderName.Length < 2)
+        {
+            return BadRequest("Вкажіть ім'я власника картки.");
+        }
+
+        if (request.ExpiryMonth is < 1 or > 12)
+        {
+            return BadRequest("Оберіть коректний місяць дії картки.");
+        }
+
+        var expiry = new DateOnly(request.ExpiryYear, request.ExpiryMonth, 1).AddMonths(1).AddDays(-1);
+        if (expiry < DateOnly.FromDateTime(DateTime.UtcNow))
+        {
+            return BadRequest("Строк дії картки вже минув.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.CardNumber))
+        {
+            var digits = Regex.Replace(request.CardNumber, "[^0-9]", "");
+
+            if (digits.Length < 13 || digits.Length > 19 || !IsValidLuhn(digits))
+            {
+                return BadRequest("Номер картки виглядає некоректно.");
+            }
+
+            card.Brand = DetectBrand(digits);
+            card.Last4 = digits[^4..];
+        }
+
+        card.CardholderName = cardholderName;
+        card.ExpiryMonth = request.ExpiryMonth;
+        card.ExpiryYear = request.ExpiryYear;
+
+        if (request.IsDefault && !card.IsDefault)
+        {
+            await ClearDefaultAsync(userId, cancellationToken);
+            card.IsDefault = true;
+        }
+
         await db.SaveChangesAsync(cancellationToken);
 
         return ToDto(card);

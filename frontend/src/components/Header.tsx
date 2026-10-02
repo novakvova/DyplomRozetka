@@ -59,7 +59,7 @@ export function Header() {
     const { data: cart } = useGetCartQuery(undefined, { skip: !user });
     const { data: favorites = [] } = useGetFavoritesQuery(undefined, { skip: !user });
     const { data: categories = [] } = useGetCategoriesQuery();
-    const cartItemsCount = (cart?.items ?? []).reduce((total, item) => total + item.quantity, 0);
+    const cartItemsCount = !user ? 0 : (cart?.items ?? []).reduce((total, item) => total + item.quantity, 0);
 
     const [search, setSearch] = useState('');
     const [drawerOpen, setDrawerOpen] = useState(false);
@@ -109,7 +109,7 @@ export function Header() {
                 <div className="icon-actions">
                     <NavLink to="/favorites" className="icon-action" aria-label="Обране">
                         <SolidHeartIcon size={26} />
-                        {favorites.length > 0 && <span className="icon-badge">{favorites.length}</span>}
+                        {user && favorites.length > 0 && <span className="icon-badge">{favorites.length}</span>}
                     </NavLink>
 
                     <button

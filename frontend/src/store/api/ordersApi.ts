@@ -20,7 +20,11 @@ export const ordersApi = apiSlice.injectEndpoints({
             query: (body) => ({ url: '/orders/checkout', method: 'POST', body }),
             invalidatesTags: ['Orders', 'Cart'],
         }),
+        cancelOrder: builder.mutation<void, string>({
+            query: (id) => ({ url: `/orders/${id}/cancel`, method: 'POST' }),
+            invalidatesTags: ['Orders'],
+        }),
     }),
 });
 
-export const { useGetOrdersQuery, useCheckoutMutation } = ordersApi;
+export const { useGetOrdersQuery, useCheckoutMutation, useCancelOrderMutation } = ordersApi;
