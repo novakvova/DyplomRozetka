@@ -4,32 +4,42 @@ import {
     ShoppingBag,
     Users,
 } from 'lucide-react';
+import {Link} from 'react-router-dom';
+import {AdminSalesChart} from '../components/AdminSalesChart';
+import {AdminOrdersChart} from '../components/AdminOrdersChart';
 
-import { useGetAdminOrdersQuery } from '../../store/api/adminApi';
+import {
+    useGetAdminOrdersQuery,
+    useGetUsersQuery,
+} from '../../store/api/adminApi';
+
 import {
     useGetCategoriesQuery,
     useGetProductsQuery,
 } from '../../store/api/catalogApi';
-import { useGetUsersQuery } from '../../store/api/adminApi';
 
 export function AdminDashboardPage() {
-    const { data: categories = [] } =
-        useGetCategoriesQuery();
+    const {
+        data: categories = [],
+    } = useGetCategoriesQuery();
 
-    const { data: productsPage } =
-        useGetProductsQuery({
-            pageSize: 100,
-        });
+    const {
+        data: productsPage,
+    } = useGetProductsQuery({
+        pageSize: 100,
+    });
 
-    const { data: users = [] } =
-        useGetUsersQuery();
+    const {
+        data: users = [],
+    } = useGetUsersQuery();
 
     const {
         data: orders = [],
         isLoading: ordersLoading,
     } = useGetAdminOrdersQuery();
 
-    const products = productsPage?.items ?? [];
+    const products =
+        productsPage?.items ?? [];
 
     const stats = [
         {
@@ -54,145 +64,278 @@ export function AdminDashboardPage() {
         },
     ];
 
-    const recentOrders = orders.slice(0, 5);
+    const recentOrders =
+        orders.slice(0, 5);
 
     return (
         <div>
+            {/* PAGE HEADER */}
+
             <div className="mb-6">
                 <h1 className="m-0 text-2xl font-bold text-gray-900">
                     Головна
                 </h1>
 
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="mb-0 mt-1 text-sm text-gray-500">
                     Огляд магазину Lumio
                 </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                {stats.map((stat) => {
-                    const Icon = stat.icon;
+            {/* DASHBOARD GRID */}
 
-                    return (
-                        <div
-                            key={stat.title}
-                            className="rounded-2xl border border-gray-200 bg-white p-5"
-                        >
-                            <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 text-gray-700">
-                                <Icon size={22} />
-                            </div>
+            <div className="grid grid-cols-12 gap-4 md:gap-6">
+                {/* METRICS */}
 
-                            <div className="flex items-end justify-between gap-3">
-                                <div>
-                                    <p className="m-0 text-sm text-gray-500">
-                                        {stat.title}
-                                    </p>
+                <div className="col-span-12">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 md:gap-6">
+                        {stats.map((stat) => {
+                            const Icon =
+                                stat.icon;
 
-                                    <h2 className="mb-0 mt-1 text-2xl font-bold text-gray-900">
-                                        {stat.value}
-                                    </h2>
+                            return (
+                                <div
+                                    key={
+                                        stat.title
+                                    }
+                                    className="
+                                        rounded-2xl
+                                        border
+                                        border-gray-200
+                                        bg-white
+                                        p-5
+                                        md:p-6
+                                    "
+                                >
+                                    <div
+                                        className="
+                                            flex
+                                            h-12
+                                            w-12
+                                            items-center
+                                            justify-center
+                                            rounded-xl
+                                            bg-gray-100
+                                            text-gray-800
+                                        "
+                                    >
+                                        <Icon
+                                            size={
+                                                24
+                                            }
+                                        />
+                                    </div>
+
+                                    <div className="mt-5">
+                                        <span className="text-sm text-gray-500">
+                                            {
+                                                stat.title
+                                            }
+                                        </span>
+
+                                        <h4 className="mb-0 mt-2 text-2xl font-bold text-gray-800">
+                                            {
+                                                stat.value
+                                            }
+                                        </h4>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-
-            <div className="mt-6 rounded-2xl border border-gray-200 bg-white">
-                <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-                    <div>
-                        <h2 className="m-0 text-lg font-semibold text-gray-900">
-                            Останні замовлення
-                        </h2>
-
-                        <p className="mb-0 mt-1 text-sm text-gray-500">
-                            Останні замовлення магазину
-                        </p>
+                            );
+                        })}
                     </div>
                 </div>
+                {/* CHARTS */}
 
-                {ordersLoading ? (
-                    <div className="p-8 text-center text-sm text-gray-500">
-                        Завантаження...
-                    </div>
-                ) : recentOrders.length === 0 ? (
-                    <div className="p-8 text-center text-sm text-gray-500">
-                        Замовлень поки немає.
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full border-collapse">
-                            <thead>
-                                <tr className="border-b border-gray-200 bg-gray-50">
-                                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-gray-500">
-                                        Замовлення
-                                    </th>
+                <div className="col-span-12 xl:col-span-5">
+                    <AdminSalesChart
+                        orders={orders}
+                    />
+                </div>
 
-                                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-gray-500">
-                                        Клієнт
-                                    </th>
+                <div className="col-span-12 xl:col-span-7">
+                    <AdminOrdersChart
+                        orders={orders}
+                    />
+                </div>
+                {/* RECENT ORDERS */}
 
-                                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-gray-500">
-                                        Дата
-                                    </th>
+                <div className="col-span-12">
+                    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                        {/* CARD HEADER */}
 
-                                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-gray-500">
-                                        Сума
-                                    </th>
+                        <div
+                            className="flex flex-col gap-3 border-b border-gray-200 px-5 py-5 sm:flex-row sm:items-center sm:justify-between md:px-6">
+                            <div>
+                                <h2 className="m-0 text-lg font-semibold text-gray-800">
+                                    Останні замовлення
+                                </h2>
 
-                                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-gray-500">
-                                        Статус
-                                    </th>
-                                </tr>
-                            </thead>
+                                <p className="mb-0 mt-1 text-sm text-gray-500">
+                                    Останні замовлення магазину
+                                </p>
+                            </div>
 
-                            <tbody>
-                                {recentOrders.map((order) => (
-                                    <tr
-                                        key={order.id}
-                                        className="border-b border-gray-100 last:border-b-0"
-                                    >
-                                        <td className="px-5 py-4 text-sm font-semibold text-gray-800">
-                                            {order.number}
-                                        </td>
+                            <Link
+                                to="/admin/orders"
+                                className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900"
+                            >
+                                Переглянути всі
+                            </Link>
+                        </div>
 
-                                        <td className="px-5 py-4 text-sm text-gray-600">
-                                            {order.recipientFullName}
-                                        </td>
+                        {/* LOADING */}
 
-                                        <td className="px-5 py-4 text-sm text-gray-600">
-                                            {new Date(
-                                                order.createdAt,
-                                            ).toLocaleDateString(
-                                                'uk-UA',
-                                            )}
-                                        </td>
+                        {ordersLoading ? (
+                            <div className="p-10 text-center text-sm text-gray-500">
+                                Завантаження...
+                            </div>
+                        ) : recentOrders.length ===
+                        0 ? (
+                            <div className="p-10 text-center text-sm text-gray-500">
+                                Замовлень
+                                поки немає.
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full border-collapse">
+                                    <thead>
+                                    <tr className="border-b border-gray-200 bg-gray-50">
+                                        <th className="whitespace-nowrap px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 md:px-6">
+                                            Замовлення
+                                        </th>
 
-                                        <td className="px-5 py-4 text-sm font-semibold text-gray-800">
-                                            {order.total.toLocaleString(
-                                                'uk-UA',
-                                            )}{' '}
-                                            ₴
-                                        </td>
+                                        <th className="whitespace-nowrap px-5 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                                            Клієнт
+                                        </th>
 
-                                        <td className="px-5 py-4">
-                                            <span className="inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
-                                                {getOrderStatusLabel(
-                                                    order.status,
-                                                )}
-                                            </span>
-                                        </td>
+                                        <th className="whitespace-nowrap px-5 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                                            Дата
+                                        </th>
+
+                                        <th className="whitespace-nowrap px-5 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                                            Сума
+                                        </th>
+
+                                        <th className="whitespace-nowrap px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 md:px-6">
+                                            Статус
+                                        </th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                    </thead>
+
+                                    <tbody>
+                                    {recentOrders.map(
+                                        (
+                                            order,
+                                        ) => (
+                                            <tr
+                                                key={
+                                                    order.id
+                                                }
+                                                className="border-b border-gray-100 last:border-b-0"
+                                            >
+                                                <td className="whitespace-nowrap px-5 py-4 text-sm font-semibold text-gray-800 md:px-6">
+                                                    {
+                                                        order.number
+                                                    }
+                                                </td>
+
+                                                <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-600">
+                                                    {
+                                                        order.recipientFullName
+                                                    }
+                                                </td>
+
+                                                <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-600">
+                                                    {new Date(
+                                                        order.createdAt,
+                                                    ).toLocaleDateString(
+                                                        'uk-UA',
+                                                    )}
+                                                </td>
+
+                                                <td className="whitespace-nowrap px-5 py-4 text-sm font-semibold text-gray-800">
+                                                    {order.total.toLocaleString(
+                                                        'uk-UA',
+                                                    )}{' '}
+                                                    ₴
+                                                </td>
+
+                                                <td className="whitespace-nowrap px-5 py-4 md:px-6">
+                                                    <OrderStatusBadge
+                                                        status={
+                                                            order.status
+                                                        }
+                                                    />
+                                                </td>
+                                            </tr>
+                                        ),
+                                    )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
-                )}
+                </div>
             </div>
         </div>
     );
 }
 
-function getOrderStatusLabel(status: string) {
+function OrderStatusBadge({
+                              status,
+                          }: {
+    status: string;
+}) {
+    const label =
+        getOrderStatusLabel(status);
+
+    const color =
+        getOrderStatusColor(status);
+
+    return (
+        <span
+            className={`
+                inline-flex
+                items-center
+                rounded-full
+                px-2.5
+                py-1
+                text-xs
+                font-medium
+                ${color}
+            `}
+        >
+            {label}
+        </span>
+    );
+}
+
+function getOrderStatusColor(
+    status: string,
+) {
+    switch (status) {
+        case 'Placed':
+            return 'bg-amber-50 text-amber-700';
+
+        case 'Processing':
+            return 'bg-blue-50 text-blue-700';
+
+        case 'Shipped':
+            return 'bg-indigo-50 text-indigo-700';
+
+        case 'Completed':
+            return 'bg-green-50 text-green-700';
+
+        case 'Cancelled':
+            return 'bg-red-50 text-red-700';
+
+        default:
+            return 'bg-gray-100 text-gray-700';
+    }
+}
+
+function getOrderStatusLabel(
+    status: string,
+) {
     switch (status) {
         case 'Placed':
             return 'Очікує оплати';

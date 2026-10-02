@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import {FormEvent, useState} from 'react';
 import {
     Pencil,
     Plus,
@@ -7,7 +7,7 @@ import {
     X,
 } from 'lucide-react';
 
-import { ProductImagesManager } from '../../components/ProductImagesManager';
+import {ProductImagesManager} from '../../components/ProductImagesManager';
 
 import {
     useCreateProductMutation,
@@ -21,11 +21,11 @@ import {
     useGetProductsQuery,
 } from '../../store/api/catalogApi';
 
-import { extractErrorMessage } from '../../store/api/client';
-import { useAppDispatch } from '../../store/hooks';
-import { messageSet } from '../../store/uiSlice';
+import {extractErrorMessage} from '../../store/api/client';
+import {useAppDispatch} from '../../store/hooks';
+import {messageSet} from '../../store/uiSlice';
 
-import type { Product } from '../../types';
+import type {Product} from '../../types';
 
 export function AdminProductsPage() {
     const dispatch = useAppDispatch();
@@ -34,10 +34,10 @@ export function AdminProductsPage() {
     // DATA
     // ============================================================
 
-    const { data: categories = [] } =
+    const {data: categories = []} =
         useGetCategoriesQuery();
 
-    const { data: productsPage } =
+    const {data: productsPage} =
         useGetProductsQuery({
             pageSize: 100,
         });
@@ -48,10 +48,10 @@ export function AdminProductsPage() {
     // MUTATIONS
     // ============================================================
 
-    const [createProduct, { isLoading: isCreating }] =
+    const [createProduct, {isLoading: isCreating}] =
         useCreateProductMutation();
 
-    const [updateProduct, { isLoading: isUpdating }] =
+    const [updateProduct, {isLoading: isUpdating}] =
         useUpdateProductMutation();
 
     const [deleteProduct] =
@@ -72,6 +72,8 @@ export function AdminProductsPage() {
 
     const [showCreateForm, setShowCreateForm] =
         useState(false);
+    const [productToDelete, setProductToDelete] =
+        useState<Product | null>(null);
 
     // ============================================================
     // SEARCH
@@ -265,24 +267,21 @@ export function AdminProductsPage() {
     // DELETE
     // ============================================================
 
-    async function handleDeleteProduct(
-        id: string,
-        title: string,
-    ) {
-        const confirmed = window.confirm(
-            `Видалити товар "${title}"?`,
-        );
-
-        if (!confirmed) {
+    async function handleDeleteProduct() {
+        if (!productToDelete) {
             return;
         }
 
         try {
-            await deleteProduct(id).unwrap();
+            await deleteProduct(
+                productToDelete.id,
+            ).unwrap();
 
             dispatch(
                 messageSet('Товар видалено.'),
             );
+
+            setProductToDelete(null);
         } catch (error) {
             dispatch(
                 messageSet(
@@ -323,7 +322,7 @@ export function AdminProductsPage() {
                         }
                         className="inline-flex items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600"
                     >
-                        <Plus size={18} />
+                        <Plus size={18}/>
                         Додати товар
                     </button>
                 </div>
@@ -363,7 +362,8 @@ export function AdminProductsPage() {
                                 </p>
                             </div>
 
-                            <div className="flex w-full max-w-md items-center gap-3 rounded-lg border border-gray-200 px-4 py-2.5">
+                            <div
+                                className="flex w-full max-w-md items-center gap-3 rounded-lg border border-gray-200 px-4 py-2.5">
                                 <Search
                                     size={19}
                                     className="shrink-0 text-gray-400"
@@ -399,7 +399,8 @@ export function AdminProductsPage() {
                                         key={item.id}
                                         className="p-5"
                                     >
-                                        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                                        <div
+                                            className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                                             <div className="min-w-0">
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <h3 className="m-0 text-base font-semibold text-gray-900">
@@ -409,7 +410,8 @@ export function AdminProductsPage() {
                                                     </h3>
 
                                                     {item.badge && (
-                                                        <span className="rounded-full bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-600">
+                                                        <span
+                                                            className="rounded-full bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-600">
                                                             {
                                                                 item.badge
                                                             }
@@ -417,7 +419,8 @@ export function AdminProductsPage() {
                                                     )}
                                                 </div>
 
-                                                <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-gray-500">
+                                                <div
+                                                    className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-gray-500">
                                                     <span>
                                                         SKU:{' '}
                                                         {
@@ -450,15 +453,16 @@ export function AdminProductsPage() {
 
                                                     {item.previousPrice !=
                                                         null && (
-                                                        <span className="text-sm text-gray-400 line-through">
+                                                            <span className="text-sm text-gray-400 line-through">
                                                             {item.previousPrice.toLocaleString(
                                                                 'uk-UA',
                                                             )}{' '}
-                                                            ₴
+                                                                ₴
                                                         </span>
-                                                    )}
+                                                        )}
 
-                                                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
+                                                    <span
+                                                        className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
                                                         На складі:{' '}
                                                         {
                                                             item.stockQuantity
@@ -488,9 +492,8 @@ export function AdminProductsPage() {
                                                 <button
                                                     type="button"
                                                     onClick={() =>
-                                                        handleDeleteProduct(
-                                                            item.id,
-                                                            item.title,
+                                                        setProductToDelete(
+                                                            item,
                                                         )
                                                     }
                                                     className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
@@ -950,6 +953,57 @@ export function AdminProductsPage() {
                     </form>
                 </Modal>
             )}
+
+            {/* ====================================================
+                DELETE PRODUCT MODAL
+            ==================================================== */}
+
+            {productToDelete && (
+                <Modal
+                    title="Видалення товару"
+                    subtitle="Підтвердження видалення"
+                    onClose={() =>
+                        setProductToDelete(null)
+                    }
+                >
+                    <div>
+                        <p className="m-0 text-sm leading-6 text-gray-600">
+                            Ви впевнені, що хочете видалити товар{' '}
+                            <span className="font-semibold text-gray-900">
+                                «{productToDelete.title}»
+                            </span>
+                            ?
+                        </p>
+
+                        <div className="mt-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3">
+                            <p className="m-0 text-sm text-red-600">
+                                Цю дію неможливо скасувати.
+                            </p>
+                        </div>
+
+                        <div className="mt-6 flex justify-end gap-3 border-t border-gray-200 pt-5">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setProductToDelete(null)
+                                }
+                                className={secondaryButtonClass}
+                            >
+                                Скасувати
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={handleDeleteProduct}
+                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-600"
+                            >
+                                <Trash2 size={17}/>
+                                Видалити
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
         </>
     );
 }
@@ -959,9 +1013,9 @@ export function AdminProductsPage() {
 // ============================================================
 
 function StatCard({
-    label,
-    value,
-}: {
+                      label,
+                      value,
+                  }: {
     label: string;
     value: number;
 }) {
@@ -979,9 +1033,9 @@ function StatCard({
 }
 
 function Field({
-    label,
-    children,
-}: {
+                   label,
+                   children,
+               }: {
     label: string;
     children: React.ReactNode;
 }) {
@@ -997,11 +1051,11 @@ function Field({
 }
 
 function Modal({
-    title,
-    subtitle,
-    onClose,
-    children,
-}: {
+                   title,
+                   subtitle,
+                   onClose,
+                   children,
+               }: {
     title: string;
     subtitle?: string;
     onClose: () => void;
@@ -1034,10 +1088,20 @@ function Modal({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100"
+                        className="
+        flex h-9 w-9 shrink-0
+        items-center justify-center
+        rounded-lg
+        text-xl font-medium
+        leading-none
+        text-gray-500
+        transition
+        hover:bg-gray-100
+        hover:text-gray-800
+    "
                         aria-label="Закрити"
                     >
-                        <X size={20} />
+                        x
                     </button>
                 </div>
 

@@ -9,7 +9,6 @@ import {
     Pencil,
     Plus,
     Trash2,
-    X,
 } from 'lucide-react';
 
 import {
@@ -72,6 +71,11 @@ export function AdminCategoriesPage() {
     const [
         editingCategory,
         setEditingCategory,
+    ] = useState<Category | null>(null);
+
+    const [
+        categoryToDelete,
+        setCategoryToDelete,
     ] = useState<Category | null>(null);
 
     const [
@@ -205,26 +209,23 @@ export function AdminCategoriesPage() {
     // DELETE
     // ============================================================
 
-    async function handleDeleteCategory(
-        id: string,
-        title: string,
-    ) {
-        const confirmed = window.confirm(
-            `Видалити категорію "${title}"?`,
-        );
-
-        if (!confirmed) {
+    async function handleDeleteCategory() {
+        if (!categoryToDelete) {
             return;
         }
 
         try {
-            await deleteCategory(id).unwrap();
+            await deleteCategory(
+                categoryToDelete.id,
+            ).unwrap();
 
             dispatch(
                 messageSet(
                     'Категорію видалено.',
                 ),
             );
+
+            setCategoryToDelete(null);
         } catch (error) {
             dispatch(
                 messageSet(
@@ -526,9 +527,8 @@ export function AdminCategoriesPage() {
                                                 <button
                                                     type="button"
                                                     onClick={() =>
-                                                        handleDeleteCategory(
-                                                            item.id,
-                                                            item.title,
+                                                        setCategoryToDelete(
+                                                            item,
                                                         )
                                                     }
                                                     className={deleteButtonClass}
@@ -759,6 +759,55 @@ export function AdminCategoriesPage() {
                     </form>
                 </Modal>
             )}
+
+            {/* DELETE MODAL */}
+
+            {categoryToDelete && (
+                <Modal
+                    title="Видалення категорії"
+                    subtitle="Підтвердження видалення"
+                    onClose={() =>
+                        setCategoryToDelete(null)
+                    }
+                >
+                    <div>
+                        <p className="m-0 text-sm leading-6 text-gray-600">
+                            Ви впевнені, що хочете видалити категорію{' '}
+                            <span className="font-semibold text-gray-900">
+                                «{categoryToDelete.title}»
+                            </span>
+                            ?
+                        </p>
+
+                        <div className="mt-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3">
+                            <p className="m-0 text-sm text-red-600">
+                                Цю дію неможливо скасувати. Категорію з товарами видалити не вдасться.
+                            </p>
+                        </div>
+
+                        <div className="mt-6 flex justify-end gap-3 border-t border-gray-200 pt-5">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setCategoryToDelete(null)
+                                }
+                                className={secondaryButtonClass}
+                            >
+                                Скасувати
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={handleDeleteCategory}
+                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-600"
+                            >
+                                <Trash2 size={17} />
+                                Видалити
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
         </>
     );
 }
@@ -823,10 +872,10 @@ function Modal({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xl font-medium leading-none text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"
                         aria-label="Закрити"
                     >
-                        <X size={20} />
+                        ×
                     </button>
                 </div>
 
