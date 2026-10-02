@@ -120,7 +120,7 @@ export function AccountDrawer({ open, onClose, onOpenAuth }: AccountDrawerProps)
                                 <div className="account-drawer-group">
                                     <span className="account-drawer-group-title">Керування</span>
                                     <NavLink to="/admin" onClick={onClose}>
-                                        <Shield size={17} /> Адмінка
+                                        <Shield size={17} /> Панель адміністратора
                                     </NavLink>
                                 </div>
                             )}

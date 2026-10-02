@@ -1,5 +1,11 @@
 import { apiSlice } from '../apiSlice';
-import type { Category, Product, ProductImage, User } from '../../types';
+import type {
+    Category,
+    Order,
+    Product,
+    ProductImage,
+    User
+} from '../../types';
 
 type ProductRequest = {
     sku: string;
@@ -53,6 +59,14 @@ export const adminApi = apiSlice.injectEndpoints({
             query: (body) => ({ url: '/admin/products', method: 'POST', body }),
             invalidatesTags: ['Products', 'Categories'],
         }),
+        updateProduct: builder.mutation<Product, ProductRequest & { id: string }>({
+            query: ({ id, ...body }) => ({
+            url: `/admin/products/${id}`,
+            method: 'PUT',
+                body,
+            }),
+            invalidatesTags: ['Products', 'Categories'],
+        }),
         deleteProduct: builder.mutation<void, string>({
             query: (id) => ({ url: `/admin/products/${id}`, method: 'DELETE' }),
             invalidatesTags: ['Products'],
@@ -63,6 +77,13 @@ export const adminApi = apiSlice.injectEndpoints({
         }),
         updateCategory: builder.mutation<Category, CategoryRequest & { id: string }>({
             query: ({ id, ...body }) => ({ url: `/admin/categories/${id}`, method: 'PUT', body: toCategoryFormData(body) }),
+            invalidatesTags: ['Categories'],
+        }),
+        deleteCategory: builder.mutation<void, string>({
+            query: (id) => ({
+            url: `/admin/categories/${id}`,
+            method: 'DELETE',
+            }),
             invalidatesTags: ['Categories'],
         }),
         createAdmin: builder.mutation<User, AdminRequest>({
@@ -93,12 +114,30 @@ export const adminApi = apiSlice.injectEndpoints({
             query: ({ productId, imageId }) => ({ url: `/admin/products/${productId}/images/${imageId}`, method: 'DELETE' }),
             invalidatesTags: (_result, _error, { productId }) => [{ type: 'ProductImages', id: productId }, 'Products'],
         }),
+        getAdminOrders: builder.query<Order[], void>({
+            query: () => '/admin/orders',
+            providesTags: ['Orders'],
+        }),
+
+        updateOrderStatus: builder.mutation<
+            Order,
+            { id: string; status: string }
+        >({
+            query: ({ id, status }) => ({
+                url: `/admin/orders/${id}/status`,
+                method: 'PUT',
+                body: { status },
+            }),
+            invalidatesTags: ['Orders'],
+        }),
     }),
 });
 
 export const {
     useGetUsersQuery,
     useCreateProductMutation,
+    useUpdateProductMutation,
+    useDeleteCategoryMutation,
     useDeleteProductMutation,
     useCreateCategoryMutation,
     useUpdateCategoryMutation,
@@ -108,4 +147,6 @@ export const {
     useGetProductImagesQuery,
     useUploadProductImagesMutation,
     useDeleteProductImageMutation,
+    useGetAdminOrdersQuery,
+    useUpdateOrderStatusMutation,
 } = adminApi;
