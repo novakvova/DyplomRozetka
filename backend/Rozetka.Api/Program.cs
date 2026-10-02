@@ -63,7 +63,12 @@ builder.Services.AddOpenApi(options =>
 });
 
 builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddSingleton<TotpService>();
 builder.Services.AddSingleton<ImageProcessingService>();
+builder.Services.AddMemoryCache();
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.AddSingleton<EmailService>();
+builder.Services.AddSingleton<EmailCodeService>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -84,6 +89,7 @@ builder.Services
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
+builder.Services.Configure<GoogleAuthOptions>(builder.Configuration.GetSection(GoogleAuthOptions.SectionName));
 
 var corsOptions = builder.Configuration.GetSection(FrontendCorsOptions.SectionName).Get<FrontendCorsOptions>()
     ?? new FrontendCorsOptions();
@@ -93,7 +99,8 @@ builder.Services.AddCors(options =>
     options.AddPolicy(FrontendCorsOptions.PolicyName, policy =>
         policy.WithOrigins(corsOptions.AllowedOrigins)
             .AllowAnyHeader()
-            .AllowAnyMethod());
+            .AllowAnyMethod()
+            .AllowCredentials());
 });
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
@@ -106,6 +113,19 @@ builder.Services
     {
         options.RequireHttpsMetadata = false;
         options.SaveToken = true;
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                if (string.IsNullOrEmpty(context.Token)
+                    && context.Request.Cookies.TryGetValue(AuthCookie.Name, out var cookieToken))
+                {
+                    context.Token = cookieToken;
+                }
+
+                return Task.CompletedTask;
+            }
+        };
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = false,

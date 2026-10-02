@@ -17,6 +17,8 @@ public class Product
     public string ManufacturerUrl { get; set; } = string.Empty;
     public string Specifications { get; set; } = string.Empty;
     public int StockQuantity { get; set; }
+    public string Condition { get; set; } = "new";
+    public int DeliveryDays { get; set; } = 2;
     public Guid CategoryId { get; set; }
     public Category? Category { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

@@ -9,13 +9,15 @@ import {
 } from 'react-router-dom';
 
 import {AdminLayout} from './admin/layout/AdminLayout';
-import {AdminProductsPage} from './admin/pages/AdminProductsPage';
+import {AdminCreateAdminPage} from './admin/pages/AdminCreateAdminPage';
 import {AdminCategoriesPage} from './admin/pages/AdminCategoriesPage';
+import {AdminDashboardPage} from './admin/pages/AdminDashboardPage';
 import {AdminOrdersPage} from './admin/pages/AdminOrdersPage';
-import { AdminUsersPage } from './admin/pages/AdminUsersPage';
-import { AdminCreateAdminPage } from './admin/pages/AdminCreateAdminPage';
-import { AdminDashboardPage } from './admin/pages/AdminDashboardPage';
+import {AdminProductsPage} from './admin/pages/AdminProductsPage';
+import {AdminUsersPage} from './admin/pages/AdminUsersPage';
 
+import {CartAddedModal} from './components/CartAddedModal';
+import {FavoriteAddedModal} from './components/FavoriteAddedModal';
 import {Footer} from './components/Footer';
 import {Header} from './components/Header';
 
@@ -24,13 +26,18 @@ import {CartPage} from './pages/CartPage';
 import {CatalogPage} from './pages/CatalogPage';
 import {CheckoutPage} from './pages/CheckoutPage';
 import {FavoritesPage} from './pages/FavoritesPage';
+import {ForgotPasswordPage} from './pages/ForgotPasswordPage';
 import {MainPage} from './pages/MainPage';
 import {OrdersPage} from './pages/OrdersPage';
 import {PasswordChangePage} from './pages/PasswordChangePage';
+import {PaymentCardFormPage} from './pages/PaymentCardFormPage';
 import {ProductPage} from './pages/ProductPage';
 import {ProfilePage} from './pages/ProfilePage';
+import {ResetPasswordPage} from './pages/ResetPasswordPage';
+import {TwoFactorCodePage} from './pages/TwoFactorCodePage';
 import {TwoFactorPage} from './pages/TwoFactorPage';
 
+import {apiSlice} from './store/apiSlice';
 import {useGetMeQuery} from './store/api/authApi';
 import {
     sessionExpiredHandled,
@@ -58,10 +65,6 @@ function AppRoutes() {
         (state) => state.auth.user,
     );
 
-    const token = useAppSelector(
-        (state) => state.auth.token,
-    );
-
     const sessionExpired = useAppSelector(
         (state) => state.auth.sessionExpired,
     );
@@ -73,7 +76,7 @@ function AppRoutes() {
     const {data: me} = useGetMeQuery(
         undefined,
         {
-            skip: !token,
+            skip: !user,
         },
     );
 
@@ -90,6 +93,10 @@ function AppRoutes() {
 
     useEffect(() => {
         if (sessionExpired) {
+            dispatch(
+                apiSlice.util.resetApiState(),
+            );
+
             dispatch(
                 messageSet(
                     'Сесія застаріла. Увійдіть ще раз.',
@@ -124,7 +131,6 @@ function AppRoutes() {
             )}
 
             <Routes>
-
                 <Route
                     path="/"
                     element={<MainPage/>}
@@ -176,6 +182,16 @@ function AppRoutes() {
                 />
 
                 <Route
+                    path="/profile/payment-cards/new"
+                    element={<PaymentCardFormPage/>}
+                />
+
+                <Route
+                    path="/profile/payment-cards/:id/edit"
+                    element={<PaymentCardFormPage/>}
+                />
+
+                <Route
                     path="/profile/password"
                     element={<PasswordChangePage/>}
                 />
@@ -183,6 +199,21 @@ function AppRoutes() {
                 <Route
                     path="/profile/2fa"
                     element={<TwoFactorPage/>}
+                />
+
+                <Route
+                    path="/2fa-code"
+                    element={<TwoFactorCodePage/>}
+                />
+
+                <Route
+                    path="/forgot-password"
+                    element={<ForgotPasswordPage/>}
+                />
+
+                <Route
+                    path="/reset-password"
+                    element={<ResetPasswordPage/>}
                 />
 
                 <Route
@@ -207,30 +238,39 @@ function AppRoutes() {
 
                     <Route
                         path="products"
-                        element={<AdminProductsPage/>}
+                        element={
+                            <AdminProductsPage/>
+                        }
                     />
 
                     <Route
                         path="categories"
-                        element={<AdminCategoriesPage/>}
+                        element={
+                            <AdminCategoriesPage/>
+                        }
                     />
 
                     <Route
                         path="orders"
-                        element={<AdminOrdersPage/>}
+                        element={
+                            <AdminOrdersPage/>
+                        }
                     />
 
                     <Route
                         path="users"
-                        element={<AdminUsersPage />}
+                        element={
+                            <AdminUsersPage/>
+                        }
                     />
 
                     <Route
                         path="admins"
-                        element={<AdminCreateAdminPage />}
+                        element={
+                            <AdminCreateAdminPage/>
+                        }
                     />
                 </Route>
-
 
                 <Route
                     path="*"
@@ -244,6 +284,9 @@ function AppRoutes() {
             </Routes>
 
             {!isAdminRoute && <Footer/>}
+
+            <CartAddedModal/>
+            <FavoriteAddedModal/>
         </main>
     );
 }

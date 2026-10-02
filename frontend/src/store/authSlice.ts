@@ -3,7 +3,6 @@ import type { AuthResponse, User } from '../types';
 
 type AuthState = {
     user: User | null;
-    token: string | null;
     sessionExpired: boolean;
 };
 
@@ -12,9 +11,10 @@ function readStoredUser(): User | null {
     return raw ? (JSON.parse(raw) as User) : null;
 }
 
+localStorage.removeItem('rozetka_fullstack_token');
+
 const initialState: AuthState = {
     user: readStoredUser(),
-    token: localStorage.getItem('rozetka_fullstack_token'),
     sessionExpired: false,
 };
 
@@ -22,11 +22,9 @@ const authSlice = createSlice({
     name: 'auth',
     initialState,
     reducers: {
-        credentialsSet(state, action: PayloadAction<AuthResponse>) {
-            state.token = action.payload.token;
+        credentialsSet(state, action: PayloadAction<Pick<AuthResponse, 'user'>>) {
             state.user = action.payload.user;
             state.sessionExpired = false;
-            localStorage.setItem('rozetka_fullstack_token', action.payload.token);
             localStorage.setItem('rozetka_fullstack_user', JSON.stringify(action.payload.user));
         },
         userUpdated(state, action: PayloadAction<User>) {
@@ -35,16 +33,12 @@ const authSlice = createSlice({
         },
         logout(state) {
             state.user = null;
-            state.token = null;
             state.sessionExpired = false;
-            localStorage.removeItem('rozetka_fullstack_token');
             localStorage.removeItem('rozetka_fullstack_user');
         },
         sessionExpiredSet(state) {
             state.user = null;
-            state.token = null;
             state.sessionExpired = true;
-            localStorage.removeItem('rozetka_fullstack_token');
             localStorage.removeItem('rozetka_fullstack_user');
         },
         sessionExpiredHandled(state) {

@@ -3,27 +3,21 @@ import { sessionExpiredSet } from './authSlice';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5050/api';
 
-type AuthTokenState = {
-    auth: { token: string | null };
+type AuthUserState = {
+    auth: { user: unknown | null };
 };
 
 const rawBaseQuery = fetchBaseQuery({
     baseUrl: API_URL,
-    prepareHeaders: (headers, { getState }) => {
-        const token = (getState() as AuthTokenState).auth.token;
-        if (token) {
-            headers.set('Authorization', `Bearer ${token}`);
-        }
-        return headers;
-    },
+    credentials: 'include',
 });
 
 const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (args, api, extraOptions) => {
     const result = await rawBaseQuery(args, api, extraOptions);
 
     if (result.error && (result.error.status === 401 || result.error.status === 403)) {
-        const hadToken = (api.getState() as AuthTokenState).auth.token;
-        if (hadToken) {
+        const wasLoggedIn = (api.getState() as AuthUserState).auth.user;
+        if (wasLoggedIn) {
             api.dispatch(sessionExpiredSet());
         }
     }
@@ -34,6 +28,6 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const apiSlice = createApi({
     reducerPath: 'api',
     baseQuery: baseQueryWithReauth,
-    tagTypes: ['Auth', 'Categories', 'Products', 'Cart', 'Orders', 'Favorites', 'Reviews', 'Users', 'ProductImages', 'Addresses'],
+    tagTypes: ['Auth', 'Categories', 'Products', 'Cart', 'Orders', 'Favorites', 'Reviews', 'Users', 'ProductImages', 'Addresses', 'PaymentCards'],
     endpoints: () => ({}),
 });

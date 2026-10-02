@@ -4,13 +4,14 @@ import { extractErrorMessage } from '../api/client';
 import { useAddCartItemMutation } from '../store/api/cartApi';
 import { useGetFavoritesQuery, useToggleFavoriteMutation } from '../store/api/favoritesApi';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { messageSet } from '../store/uiSlice';
+import { messageSet, cartModalOpened, favoriteModalOpened } from '../store/uiSlice';
 
 export function useProductActions() {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
     const user = useAppSelector((state) => state.auth.user);
-    const { data: favorites = [] } = useGetFavoritesQuery(undefined, { skip: !user });
+    const { data: favoritesData } = useGetFavoritesQuery(undefined, { skip: !user });
+    const favorites = useMemo(() => (user ? favoritesData ?? [] : []), [user, favoritesData]);
     const [addCartItem] = useAddCartItemMutation();
     const [toggleFavoriteMutation] = useToggleFavoriteMutation();
 
@@ -25,7 +26,7 @@ export function useProductActions() {
 
         try {
             await addCartItem({ productId, quantity: 1 }).unwrap();
-            dispatch(messageSet('Товар додано в кошик.'));
+            dispatch(cartModalOpened());
         } catch (error) {
             dispatch(messageSet(extractErrorMessage(error, 'Не вдалося додати товар у кошик.')));
         }
@@ -38,9 +39,15 @@ export function useProductActions() {
             return;
         }
 
+        const wasFavorite = favoriteProductIds.has(productId);
+
         try {
             await toggleFavoriteMutation(productId).unwrap();
-            dispatch(messageSet('Обране оновлено.'));
+            if (wasFavorite) {
+                dispatch(messageSet('Товар видалено з вибраного.'));
+            } else {
+                dispatch(favoriteModalOpened());
+            }
         } catch (error) {
             dispatch(messageSet(extractErrorMessage(error, 'Не вдалося оновити обране.')));
         }

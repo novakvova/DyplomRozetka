@@ -4,7 +4,8 @@
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<RootNamespace>Rozetka.Api</RootNamespace>
-	</PropertyGroup>
+	  <UserSecretsId>bfed4874-23c3-4200-b1b6-e6ff295be004</UserSecretsId>
+  </PropertyGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Google.Apis.Auth" Version="1.76.0" />

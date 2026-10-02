@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { ChevronLeft, ChevronRight, Menu } from 'lucide-react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { resolveAssetUrl} from "../store/api/client";
 import { getCategoryIcon } from '../data/categoryIcons';
 import { AccountDrawer } from './AccountDrawer';
@@ -53,11 +53,13 @@ function SearchGlyph() {
 
 export function Header() {
     const navigate = useNavigate();
+    const location = useLocation();
+    const activeCategorySlug = location.pathname === '/catalog' ? new URLSearchParams(location.search).get('category') : null;
     const user = useAppSelector((state) => state.auth.user);
     const { data: cart } = useGetCartQuery(undefined, { skip: !user });
     const { data: favorites = [] } = useGetFavoritesQuery(undefined, { skip: !user });
     const { data: categories = [] } = useGetCategoriesQuery();
-    const cartItemsCount = (cart?.items ?? []).reduce((total, item) => total + item.quantity, 0);
+    const cartItemsCount = !user ? 0 : (cart?.items ?? []).reduce((total, item) => total + item.quantity, 0);
 
     const [search, setSearch] = useState('');
     const [drawerOpen, setDrawerOpen] = useState(false);
@@ -107,7 +109,7 @@ export function Header() {
                 <div className="icon-actions">
                     <NavLink to="/favorites" className="icon-action" aria-label="Обране">
                         <SolidHeartIcon size={26} />
-                        {favorites.length > 0 && <span className="icon-badge">{favorites.length}</span>}
+                        {user && favorites.length > 0 && <span className="icon-badge">{favorites.length}</span>}
                     </NavLink>
 
                     <button
@@ -135,10 +137,10 @@ export function Header() {
                     {categories.map((category) => {
                         const Icon = getCategoryIcon(category.slug);
                         return (
-                            <NavLink
+                            <Link
                                 key={category.id}
                                 to={`/catalog?category=${category.slug}`}
-                                className="category-tile-mini"
+                                className={`category-tile-mini${activeCategorySlug === category.slug ? ' active' : ''}`}
                                 title={category.description}
                             >
                                 <span className="category-tile-mini-icon">
@@ -147,7 +149,7 @@ export function Header() {
                                         : <Icon size={30} strokeWidth={1.6} />}
                                 </span>
                                 <span>{category.title}</span>
-                            </NavLink>
+                            </Link>
                         );
                     })}
                 </div>

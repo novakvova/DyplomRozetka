@@ -1,5 +1,6 @@
-import { Clock, Heart, Headphones, ListChecks, Package, RefreshCcw, Settings, ShieldCheck, Truck, User } from 'lucide-react';
+import { Clock, CreditCard, Heart, Headphones, ListChecks, Package, RefreshCcw, Settings, ShieldCheck, Truck, User } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
+import { resolveAssetUrl } from '../store/api/client';
 import { useAppSelector } from '../store/hooks';
 
 function initials(fullName: string) {
@@ -16,7 +17,11 @@ export function ProfileSidebar() {
     return (
         <aside className="profile-sidebar">
             <div className="profile-sidebar-user">
-                <span className="profile-sidebar-avatar">{initials(user.fullName)}</span>
+                {user.avatarUrl ? (
+                    <img className="profile-sidebar-avatar profile-sidebar-avatar-photo" src={resolveAssetUrl(user.avatarUrl)} alt={user.fullName} />
+                ) : (
+                    <span className="profile-sidebar-avatar">{initials(user.fullName)}</span>
+                )}
                 <strong>{user.fullName}</strong>
                 <span className="profile-sidebar-email">{user.email}</span>
             </div>
@@ -48,6 +53,13 @@ export function ProfileSidebar() {
                     </NavLink>
                     <NavLink to="/orders?status=completed">
                         <ListChecks size={16} /> Завершено
+                    </NavLink>
+                </div>
+
+                <div className="profile-sidebar-group">
+                    <span className="profile-sidebar-group-title">Оплата</span>
+                    <NavLink to="/profile/payment-cards/new">
+                        <CreditCard size={16} /> Додати картку
                     </NavLink>
                 </div>
 

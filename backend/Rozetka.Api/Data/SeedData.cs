@@ -15,7 +15,9 @@ public static class SeedData
         await EnsureProductCreatedAtColumnAsync(db);
         await EnsureCategoryImageUrlColumnAsync(db);
         await EnsureCartFavoritesReviewsOrdersTablesAsync(db);
+        await EnsureReviewReactionsTableAsync(db);
         await EnsureUserAddressesTableAsync(db);
+        await EnsurePaymentCardsTableAsync(db);
         await EnsureUserProfileColumnsAsync(db);
 
         await EnsureRoleAsync(roleManager, Roles.Admin);
@@ -284,6 +286,10 @@ public static class SeedData
             ADD COLUMN IF NOT EXISTS "BirthDate" date NULL;
             ALTER TABLE "AspNetUsers"
             ADD COLUMN IF NOT EXISTS "Gender" varchar(20) NULL;
+            ALTER TABLE "AspNetUsers"
+            ADD COLUMN IF NOT EXISTS "AvatarUrl" text NULL;
+            ALTER TABLE "AspNetUsers"
+            ADD COLUMN IF NOT EXISTS "TwoFactorSecret" text NULL;
             """);
     }
 
@@ -308,6 +314,42 @@ public static class SeedData
                 CONSTRAINT "FK_UserAddresses_AspNetUsers_UserId" FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE
             );
             CREATE INDEX IF NOT EXISTS "IX_UserAddresses_UserId" ON "UserAddresses" ("UserId");
+            """);
+    }
+
+    private static async Task EnsureReviewReactionsTableAsync(AppDbContext db)
+    {
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS "ReviewReactions" (
+                "Id" uuid NOT NULL PRIMARY KEY,
+                "ReviewId" uuid NOT NULL,
+                "UserId" uuid NOT NULL,
+                "IsLike" boolean NOT NULL,
+                "CreatedAt" timestamp with time zone NOT NULL DEFAULT NOW(),
+                CONSTRAINT "FK_ReviewReactions_Reviews_ReviewId" FOREIGN KEY ("ReviewId") REFERENCES "Reviews" ("Id") ON DELETE CASCADE,
+                CONSTRAINT "FK_ReviewReactions_AspNetUsers_UserId" FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_ReviewReactions_ReviewId_UserId" ON "ReviewReactions" ("ReviewId", "UserId");
+            CREATE INDEX IF NOT EXISTS "IX_ReviewReactions_UserId" ON "ReviewReactions" ("UserId");
+            """);
+    }
+
+    private static async Task EnsurePaymentCardsTableAsync(AppDbContext db)
+    {
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS "PaymentCards" (
+                "Id" uuid NOT NULL PRIMARY KEY,
+                "UserId" uuid NOT NULL,
+                "CardholderName" varchar(160) NOT NULL DEFAULT '',
+                "Brand" varchar(30) NOT NULL DEFAULT '',
+                "Last4" varchar(4) NOT NULL DEFAULT '',
+                "ExpiryMonth" integer NOT NULL DEFAULT 0,
+                "ExpiryYear" integer NOT NULL DEFAULT 0,
+                "IsDefault" boolean NOT NULL DEFAULT FALSE,
+                "CreatedAt" timestamp with time zone NOT NULL DEFAULT NOW(),
+                CONSTRAINT "FK_PaymentCards_AspNetUsers_UserId" FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS "IX_PaymentCards_UserId" ON "PaymentCards" ("UserId");
             """);
     }
 

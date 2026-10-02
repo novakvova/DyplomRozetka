@@ -11,7 +11,7 @@ namespace Rozetka.Api.Controllers;
 
 [ApiController]
 [Route("api/reviews")]
-public class ReviewsController(AppDbContext db) 
+public class ReviewsController(AppDbContext db)
     : ControllerBase
 {
     [HttpGet("product/{productId:guid}")]
@@ -20,11 +20,73 @@ public class ReviewsController(AppDbContext db)
     {
         var reviews = await db.Reviews
             .Include(item => item.User)
+            .Include(item => item.Reactions)
             .Where(item => item.ProductId == productId)
             .OrderByDescending(item => item.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return reviews.Select(item => item.ToDto()).ToList();
+        Guid? currentUserId = User.Identity?.IsAuthenticated == true ? CurrentUser.GetUserId(User) : null;
+
+        return reviews.Select(item => item.ToDto(currentUserId)).ToList();
+    }
+
+    [Authorize]
+    [HttpPut("{id:guid}/reaction")]
+    public async Task<ActionResult<ReviewDto>> React
+        (Guid id, ReviewReactionRequest request, CancellationToken cancellationToken)
+    {
+        var userId = CurrentUser.GetUserId(User);
+
+        bool? isLike = request.Reaction switch
+        {
+            "like" => true,
+            "dislike" => false,
+            _ => null
+        };
+
+        if (isLike is null)
+        {
+            return BadRequest("Невідомий тип реакції.");
+        }
+
+        var review = await db.Reviews
+            .Include(item => item.User)
+            .Include(item => item.Reactions)
+            .SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+
+        if (review is null)
+        {
+            return NotFound("Відгук не знайдено.");
+        }
+
+        if (review.UserId == userId)
+        {
+            return BadRequest("Не можна оцінювати власний відгук.");
+        }
+
+        var existing = review.Reactions.FirstOrDefault(item => item.UserId == userId);
+
+        if (existing is null)
+        {
+            db.ReviewReactions.Add(new ReviewReaction
+            {
+                ReviewId = review.Id,
+                UserId = userId,
+                IsLike = isLike.Value
+            });
+        }
+        else if (existing.IsLike == isLike.Value)
+        {
+            db.ReviewReactions.Remove(existing);
+        }
+        else
+        {
+            existing.IsLike = isLike.Value;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        return review.ToDto(userId);
     }
 
     [Authorize]
@@ -44,7 +106,7 @@ public class ReviewsController(AppDbContext db)
         {
             UserId = CurrentUser.GetUserId(User),
             ProductId = request.ProductId,
-            Rating = Math.Clamp(request.Rating, 
+            Rating = Math.Clamp(request.Rating,
             ValidationConstants.MinReviewLength,
             ValidationConstants.MaxReviewLength),
 
@@ -61,7 +123,7 @@ public class ReviewsController(AppDbContext db)
             .Where(item => item.ProductId == product.Id)
             .AverageAsync(item => item.Rating, cancellationToken);
 
-        await db.SaveChangesAsync(cancellationToken );
+        await db.SaveChangesAsync(cancellationToken);
 
         await db.Entry(review)
             .Reference(item => item.User)

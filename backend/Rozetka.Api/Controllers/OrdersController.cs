@@ -11,7 +11,7 @@ namespace Rozetka.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/orders")]
-public class OrdersController(AppDbContext db) 
+public class OrdersController(AppDbContext db)
     : ControllerBase
 {
     [HttpGet]
@@ -22,11 +22,38 @@ public class OrdersController(AppDbContext db)
 
         var orders = await db.Orders
             .Include(item => item.Items)
+            .ThenInclude(orderItem => orderItem.Product)
             .Where(item => item.UserId == userId)
             .OrderByDescending(item => item.CreatedAt)
             .ToListAsync(cancellationToken);
 
         return orders.Select(item => item.ToDto()).ToList();
+    }
+
+    [HttpPost("{id:guid}/cancel")]
+    public async Task<IActionResult> Cancel
+        (Guid id, CancellationToken cancellationToken)
+    {
+        var userId = CurrentUser.GetUserId(User);
+
+        var order = await db.Orders
+            .Include(item => item.Items)
+            .SingleOrDefaultAsync(item => item.Id == id && item.UserId == userId, cancellationToken);
+
+        if (order is null)
+        {
+            return NotFound("Замовлення не знайдено.");
+        }
+
+        if (order.Status is not (OrderStatus.Placed or OrderStatus.Processing))
+        {
+            return BadRequest("Це замовлення вже не можна скасувати.");
+        }
+
+        db.Orders.Remove(order);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
     }
 
     [HttpPost("checkout")]
@@ -61,6 +88,7 @@ public class OrdersController(AppDbContext db)
             Items = cart.Select(item => new OrderItem
             {
                 ProductId = item.ProductId,
+                Product = item.Product,
                 ProductTitle = item.Product!.Title,
                 UnitPrice = item.Product.Price,
                 Quantity = item.Quantity

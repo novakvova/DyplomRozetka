@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Check, CreditCard, Headphones, Lock, MapPin, Package, Truck, User, Wallet } from 'lucide-react';
 import { extractErrorMessage, formatPrice, resolveAssetUrl } from '../store/api/client';
 import { novaPoshta } from '../data/nova-poshta';
 import { useCheckoutMutation } from '../store/api/ordersApi';
 import { useGetCartQuery } from '../store/api/cartApi';
+import { useGetPaymentCardsQuery } from '../store/api/paymentCardsApi';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { messageSet } from '../store/uiSlice';
 import type { Order } from '../types';
@@ -25,28 +26,57 @@ const PAYMENT_OPTIONS = [
 
 type Step = 'form' | 'confirm' | 'success';
 
+type CheckoutDraft = {
+    step: Step;
+    fullName: string;
+    phone: string;
+    email: string;
+    deliveryId: string;
+    paymentId: string;
+    city: string;
+    deliveryPoint: string;
+    comment: string;
+};
+
 export function CheckoutPage() {
     const navigate = useNavigate();
+    const location = useLocation();
+    const draft = (location.state as { checkoutDraft?: CheckoutDraft } | null)?.checkoutDraft;
     const dispatch = useAppDispatch();
     const user = useAppSelector((state) => state.auth.user);
+    const { data: paymentCards = [] } = useGetPaymentCardsQuery(undefined, { skip: !user });
     const { data: cart = emptyCart } = useGetCartQuery(undefined, { skip: !user });
     const [checkout, { isLoading }] = useCheckoutMutation();
 
-    const [step, setStep] = useState<Step>('form');
+    const [step, setStep] = useState<Step>(draft?.step ?? 'form');
     const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
 
-    const [fullName, setFullName] = useState(user?.fullName ?? '');
-    const [phone, setPhone] = useState(user?.phone ?? '');
-    const [email, setEmail] = useState(user?.email ?? '');
-    const [deliveryId, setDeliveryId] = useState(DELIVERY_OPTIONS[0].id);
-    const [paymentId, setPaymentId] = useState(PAYMENT_OPTIONS[0].id);
-    const [city, setCity] = useState(novaPoshta[0].city);
-    const [deliveryPoint, setDeliveryPoint] = useState(novaPoshta[0].points[0]);
-    const [comment, setComment] = useState('');
+    const [fullName, setFullName] = useState(draft?.fullName ?? user?.fullName ?? '');
+    const [phone, setPhone] = useState(draft?.phone ?? user?.phone ?? '');
+    const [email, setEmail] = useState(draft?.email ?? user?.email ?? '');
+    const [deliveryId, setDeliveryId] = useState(draft?.deliveryId ?? DELIVERY_OPTIONS[0].id);
+    const [paymentId, setPaymentId] = useState(draft?.paymentId ?? PAYMENT_OPTIONS[0].id);
+    const [city, setCity] = useState(draft?.city ?? novaPoshta[0].city);
+    const [deliveryPoint, setDeliveryPoint] = useState(draft?.deliveryPoint ?? novaPoshta[0].points[0]);
+    const [comment, setComment] = useState(draft?.comment ?? '');
 
     const selectedCity = novaPoshta.find((item) => item.city === city) ?? novaPoshta[0];
     const delivery = DELIVERY_OPTIONS.find((item) => item.id === deliveryId) ?? DELIVERY_OPTIONS[0];
     const payment = PAYMENT_OPTIONS.find((item) => item.id === paymentId) ?? PAYMENT_OPTIONS[0];
+
+    const savedCard = paymentCards.find((card) => card.isDefault) ?? paymentCards[0];
+    const paymentNote = paymentId === 'card' && savedCard
+        ? `${savedCard.brand === 'Card' ? 'Картка' : savedCard.brand} •••• ${savedCard.last4}`
+        : payment.note;
+
+    function handleEditPayment() {
+        if (paymentId !== 'card') {
+            setStep('form');
+            return;
+        }
+        const checkoutDraft: CheckoutDraft = { step: 'confirm', fullName, phone, email, deliveryId, paymentId, city, deliveryPoint, comment };
+        navigate('/profile/payment-cards/new', { state: { returnTo: '/checkout', checkoutDraft } });
+    }
 
     const itemsCount = cart.items.reduce((total, item) => total + item.quantity, 0);
 
@@ -255,9 +285,9 @@ export function CheckoutPage() {
                                 <span className="checkout-review-icon"><CreditCard size={19} /></span>
                                 <div>
                                     <strong>{payment.title}</strong>
-                                    <span>{payment.note}</span>
+                                    <span>{paymentNote}</span>
                                 </div>
-                                <button type="button" onClick={() => setStep('form')}>Редагувати</button>
+                                <button type="button" onClick={handleEditPayment}>Редагувати</button>
                             </div>
                         </div>
 

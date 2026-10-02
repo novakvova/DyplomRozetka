@@ -65,8 +65,6 @@ public class ImageProcessingService(IWebHostEnvironment environment)
         await sourceStream.CopyToAsync(memoryStream, cancellationToken);
         memoryStream.Position = 0;
 
-        // Перевірка реального формату файлу по сигнатурі (magic bytes),
-        // а не лише по Content-Type, який контролює клієнт.
         var detectedFormat = FileSignatureValidator.DetectFormat(memoryStream);
         if (detectedFormat == ImageFileFormat.Unknown)
         {

@@ -11,13 +11,15 @@ import {
     ShieldCheck,
     Star,
     Store,
+    ThumbsDown,
+    ThumbsUp,
     Truck,
 } from 'lucide-react';
 import { extractErrorMessage, formatPrice, resolveAssetUrl} from "../store/api/client";
 import { ProductGrid } from '../components/ProductGrid';
 import { useProductActions } from '../hooks/useProductActions';
 import { useGetProductByIdQuery, useGetProductsQuery } from '../store/api/catalogApi';
-import { useCreateReviewMutation, useGetProductReviewsQuery } from '../store/api/reviewsApi';
+import { useCreateReviewMutation, useGetProductReviewsQuery, useReactToReviewMutation } from '../store/api/reviewsApi';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { messageSet } from '../store/uiSlice';
 
@@ -72,6 +74,7 @@ export function ProductPage() {
     );
 
     const [createReview] = useCreateReviewMutation();
+    const [reactToReview, { isLoading: reactionLoading }] = useReactToReviewMutation();
     const { favoriteProductIds, addToCart, toggleFavorite } = useProductActions();
     const reviewStripRef = useRef<HTMLDivElement | null>(null);
 
@@ -113,6 +116,18 @@ export function ProductPage() {
     function handleBuyNow(productId: string) {
         addToCart(productId);
         navigate('/cart');
+    }
+
+    async function handleReaction(reviewId: string, reaction: 'like' | 'dislike') {
+        if (!user) {
+            dispatch(messageSet('Увійдіть, щоб оцінити відгук.'));
+            return;
+        }
+        try {
+            await reactToReview({ reviewId, productId: id, reaction }).unwrap();
+        } catch (error) {
+            dispatch(messageSet(extractErrorMessage(error, 'Не вдалося зберегти оцінку.')));
+        }
     }
 
     function scrollReviews(direction: -1 | 1) {
@@ -341,6 +356,30 @@ export function ProductPage() {
                                 <span className="review-provenance">Придбано на Lumio.ua</span>
                                 <span className="review-provenance">Продавець: {product.brand}</span>
                                 <p className="review-text">{review.text}</p>
+                                <div className="review-reactions">
+                                    <button
+                                        type="button"
+                                        className={`review-reaction-btn${review.myReaction === 'like' ? ' is-active' : ''}`}
+                                        onClick={() => handleReaction(review.id, 'like')}
+                                        disabled={reactionLoading}
+                                        aria-pressed={review.myReaction === 'like'}
+                                        aria-label="Корисний відгук"
+                                    >
+                                        <ThumbsUp size={16} />
+                                        <span>{review.likesCount}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`review-reaction-btn is-dislike${review.myReaction === 'dislike' ? ' is-active' : ''}`}
+                                        onClick={() => handleReaction(review.id, 'dislike')}
+                                        disabled={reactionLoading}
+                                        aria-pressed={review.myReaction === 'dislike'}
+                                        aria-label="Некорисний відгук"
+                                    >
+                                        <ThumbsDown size={16} />
+                                        <span>{review.dislikesCount}</span>
+                                    </button>
+                                </div>
                             </article>
                         ))}
                     </div>

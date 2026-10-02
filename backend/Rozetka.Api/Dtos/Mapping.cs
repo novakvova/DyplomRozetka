@@ -17,7 +17,8 @@ public static class Mapping
             user.IsBlocked,
             user.BirthDate,
             user.Gender,
-            user.TwoFactorEnabled);
+            user.TwoFactorEnabled && !string.IsNullOrWhiteSpace(user.TwoFactorSecret),
+            user.AvatarUrl);
 
     public static CategoryDto ToDto(this Category category) =>
         new(category.Id, category.Slug, category.Title, category.Description, category.ImageUrl);
@@ -44,13 +45,30 @@ public static class Mapping
             product.ManufacturerUrl,
             product.Specifications,
             product.StockQuantity,
+            product.Condition,
+            product.DeliveryDays,
             product.Category!.ToDto());
 
     public static FavoriteDto ToDto(this FavoriteItem favorite) =>
         new(favorite.Id, favorite.Product!.ToDto(), favorite.CreatedAt);
 
-    public static ReviewDto ToDto(this Review review) =>
-        new(review.Id, review.ProductId, review.User?.FullName ?? "Користувач Rozetka", review.Rating, review.Text, review.CreatedAt);
+    public static ReviewDto ToDto(this Review review, Guid? currentUserId = null)
+    {
+        var myReaction = currentUserId is null
+            ? null
+            : review.Reactions.FirstOrDefault(item => item.UserId == currentUserId)?.IsLike;
+
+        return new ReviewDto(
+            review.Id,
+            review.ProductId,
+            review.User?.FullName ?? "Користувач Rozetka",
+            review.Rating,
+            review.Text,
+            review.CreatedAt,
+            review.Reactions.Count(item => item.IsLike),
+            review.Reactions.Count(item => !item.IsLike),
+            myReaction is null ? null : (myReaction.Value ? "like" : "dislike"));
+    }
 
     public static CartDto ToCartDto(this IEnumerable<CartItem> items)
     {
@@ -74,5 +92,5 @@ public static class Mapping
             order.Status,
             order.Total,
             order.CreatedAt,
-            order.Items.Select(item => new OrderItemDto(item.Id, item.ProductTitle, item.UnitPrice, item.Quantity)).ToList());
+            order.Items.Select(item => new OrderItemDto(item.Id, item.ProductId, item.ProductTitle, item.Product?.ImageUrl ?? string.Empty, item.UnitPrice, item.Quantity)).ToList());
 }

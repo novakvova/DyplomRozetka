@@ -2,7 +2,10 @@ import { useEffect } from 'react';
 import { Heart, LogOut, Package, Settings, Shield, ShoppingBag, User, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { resolveAssetUrl } from '../store/api/client';
+import { apiSlice } from '../store/apiSlice';
 import { logout } from '../store/authSlice';
+import { useLogoutMutation } from '../store/api/authApi';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 
 type AccountDrawerProps = {
@@ -21,6 +24,7 @@ function initials(fullName: string) {
 export function AccountDrawer({ open, onClose, onOpenAuth }: AccountDrawerProps) {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
+    const [serverLogout] = useLogoutMutation();
     const user = useAppSelector((state) => state.auth.user);
 
     useEffect(() => {
@@ -40,9 +44,15 @@ export function AccountDrawer({ open, onClose, onOpenAuth }: AccountDrawerProps)
 
     if (!open) return null;
 
-    function handleLogout() {
+    async function handleLogout() {
         onClose();
+        try {
+            await serverLogout().unwrap();
+        } catch {
+            // cookie will expire on its own; local session is cleared anyway
+        }
         dispatch(logout());
+        dispatch(apiSlice.util.resetApiState());
         navigate('/');
     }
 
@@ -59,7 +69,11 @@ export function AccountDrawer({ open, onClose, onOpenAuth }: AccountDrawerProps)
                 {user ? (
                     <>
                         <div className="account-drawer-profile">
-                            <span className="account-drawer-avatar">{initials(user.fullName)}</span>
+                            {user.avatarUrl ? (
+                                <img className="account-drawer-avatar account-drawer-avatar-photo" src={resolveAssetUrl(user.avatarUrl)} alt={user.fullName} />
+                            ) : (
+                                <span className="account-drawer-avatar">{initials(user.fullName)}</span>
+                            )}
                             <div>
                                 <strong>{user.fullName}</strong>
                                 <span>{user.email}</span>

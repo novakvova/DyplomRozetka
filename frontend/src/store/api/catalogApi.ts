@@ -1,15 +1,22 @@
 import { apiSlice } from '../apiSlice';
-import type { Category, PagedResult, Product } from '../../types';
+import type { CatalogFacets, Category, PagedResult, Product } from '../../types';
 
 export type ProductSort = 'price_asc' | 'price_desc' | 'rating' | 'newest';
 
 type ProductsQueryArgs = {
     search?: string;
     category?: string;
+    brands?: string;
+    condition?: string;
+    delivery?: string;
+    minPrice?: number;
+    maxPrice?: number;
     sort?: ProductSort;
     page?: number;
     pageSize?: number;
 };
+
+export type FacetsQueryArgs = Omit<ProductsQueryArgs, 'sort' | 'page' | 'pageSize'>;
 
 export const catalogApi = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
@@ -27,6 +34,10 @@ export const catalogApi = apiSlice.injectEndpoints({
                     ]
                     : [{ type: 'Products' as const, id: 'LIST' }],
         }),
+        getFacets: builder.query<CatalogFacets, FacetsQueryArgs>({
+            query: (args) => ({ url: '/catalog/facets', params: args }),
+            providesTags: [{ type: 'Products', id: 'LIST' }],
+        }),
         getProductById: builder.query<Product, string>({
             query: (id) => `/catalog/products/${id}`,
             providesTags: (_result, _error, id) => [{ type: 'Products', id }],
@@ -34,4 +45,4 @@ export const catalogApi = apiSlice.injectEndpoints({
     }),
 });
 
-export const { useGetCategoriesQuery, useGetProductsQuery, useGetProductByIdQuery } = catalogApi;
+export const { useGetCategoriesQuery, useGetProductsQuery, useGetFacetsQuery, useGetProductByIdQuery } = catalogApi;
